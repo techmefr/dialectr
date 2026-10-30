@@ -31,13 +31,34 @@ describe('toLomkit hardening', () => {
         ])
     })
 
-    it('passes null and undefined values through', () => {
-        expect(toLomkit(query().where('a', null).build()).search.filters).toEqual([
+    it('emits null for null and undefined values and keeps falsy values', () => {
+        expect(toLomkit(query().where('a', null).build()).search.filters).toStrictEqual([
             { field: 'a', operator: '=', value: null },
         ])
-        expect(toLomkit(query().where('a', undefined).build()).search.filters).toEqual([
-            { field: 'a', operator: '=', value: undefined },
+        const undefinedFilters = toLomkit(query().where('a', undefined).build()).search.filters ?? []
+        expect(undefinedFilters).toStrictEqual([{ field: 'a', operator: '=', value: null }])
+        expect('value' in undefinedFilters[0]).toBe(true)
+        expect(undefinedFilters[0].value).toBeNull()
+        expect(toLomkit(query().where('a', 0).where('b', false).where('c', '').build()).search.filters).toStrictEqual([
+            { field: 'a', operator: '=', value: 0 },
+            { field: 'b', operator: '=', value: false },
+            { field: 'c', operator: '=', value: '' },
         ])
+    })
+
+    it('serialises dates to ISO strings, lists included', () => {
+        const date = new Date('2026-01-02T03:04:05.000Z')
+        expect(toLomkit(query().where('d', '>', date).where('e', 'in', [date, undefined, 1]).build()).search.filters).toStrictEqual([
+            { field: 'd', operator: '>', value: '2026-01-02T03:04:05.000Z' },
+            { field: 'e', operator: 'in', value: ['2026-01-02T03:04:05.000Z', null, 1] },
+        ])
+    })
+
+    it('emits sorts as fresh plain objects with only field and direction', () => {
+        const built = query().sort('a', 'desc').build()
+        const payload = toLomkit(built)
+        expect(payload.search.sorts).toStrictEqual([{ field: 'a', direction: 'desc' }])
+        expect(payload.search.sorts?.[0]).not.toBe(built.sorts[0])
     })
 
     it('maps like without wildcard to contains and keeps explicit wildcards', () => {
@@ -131,7 +152,7 @@ describe('toLomkit hardening', () => {
 
     it('resolves the published entry through the exports map', async () => {
         const manifest = packageJson
-        expect(manifest.engines.node).toBe('>=18')
+        expect(manifest.engines.node).toBe('>=22')
         expect(manifest.peerDependencies.dialectr).toBe('workspace:^')
         const entry = new URL(`../${manifest.exports['.'].import}`, import.meta.url).href
         const built = await import(entry)

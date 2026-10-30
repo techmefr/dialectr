@@ -8,7 +8,21 @@ describe('toPocketbase search and extend', () => {
     })
 
     it('throws on search inside an include', () => {
-        expect(() => toPocketbase(query().include('posts', inner => inner.search('x')).build())).toThrow()
+        expect(() => toPocketbase(query().include('posts', inner => inner.search('x')).build())).toThrow(
+            /does not support constraints on expanded relations/,
+        )
+    })
+
+    it('throws on a pocketbase extension inside an include', () => {
+        expect(() => toPocketbase(query().include('posts', inner => inner.extend('pocketbase', 1)).build())).toThrow(
+            /does not support constraints on expanded relations/,
+        )
+    })
+
+    it('ignores extensions of other adapters inside an include', () => {
+        expect(toPocketbase(query().include('posts', inner => inner.extend('lomkit', { scopes: [] })).build())).toEqual({
+            expand: 'posts',
+        })
     })
 
     it('throws on an extension aimed at pocketbase', () => {

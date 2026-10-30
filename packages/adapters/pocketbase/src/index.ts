@@ -1,4 +1,4 @@
-import { assertQuery, containsPattern, groupByOr } from 'dialectr'
+import { containsPattern, getExtension, groupByOr, prepareQuery } from 'dialectr'
 import type { Condition, FilterNode, Query } from 'dialectr'
 
 export const POCKETBASE_TARGET = 'pocketbase'
@@ -64,11 +64,11 @@ function expression(nodes: FilterNode[]): string {
     return clusters.length > 1 ? clusters.map(cluster => `(${cluster})`).join(' || ') : (clusters[0] ?? '')
 }
 
-export function toPocketbase(query: Query): PocketbaseParams {
-    assertQuery(query)
+export function toPocketbase(source: Query): PocketbaseParams {
+    const query = prepareQuery(source)
     if (query.aggregates.length > 0) throw new Error('PocketBase does not support aggregates')
     if (query.search !== undefined) throw new Error('PocketBase does not support free-text search')
-    if (query.extensions?.[POCKETBASE_TARGET] !== undefined) throw new Error('PocketBase does not support extensions')
+    if (getExtension(query, POCKETBASE_TARGET) !== undefined) throw new Error('PocketBase does not support extensions')
     const params: PocketbaseParams = {}
     if (query.filters.length > 0) params.filter = expression(query.filters)
     if (query.sorts.length > 0) {
@@ -85,7 +85,7 @@ export function toPocketbase(query: Query): PocketbaseParams {
                 inner.includes.length === 0 &&
                 inner.aggregates.length === 0 &&
                 inner.search === undefined &&
-                inner.extensions?.[POCKETBASE_TARGET] === undefined &&
+                getExtension(inner, POCKETBASE_TARGET) === undefined &&
                 inner.limit === undefined &&
                 inner.page === undefined
             if (!empty) throw new Error('PocketBase does not support constraints on expanded relations')

@@ -1,4 +1,4 @@
-import { assertQuery, containsPattern } from 'dialectr'
+import { containsPattern, getExtension, prepareQuery } from 'dialectr'
 import type { Aggregate, FilterNode, Include, Query } from 'dialectr'
 
 export interface LomkitFilter {
@@ -43,7 +43,7 @@ export const LOMKIT_TARGET = 'lomkit'
 const EXTENSION_KEYS = ['scopes', 'instructions', 'gates'] as const
 
 function extension(query: Query): Partial<LomkitSearch> {
-    const value = query.extensions?.[LOMKIT_TARGET]
+    const value = getExtension(query, LOMKIT_TARGET)
     if (value === undefined) return {}
     if (value === null || typeof value !== 'object' || Array.isArray(value)) {
         throw new Error('The lomkit extension must be an object')
@@ -60,6 +60,12 @@ function extension(query: Query): Partial<LomkitSearch> {
     return result
 }
 
+function scalar(value: unknown): unknown {
+    if (value === undefined) return null
+    if (value instanceof Date) return value.toISOString()
+    return value
+}
+
 function filters(nodes: FilterNode[]): LomkitFilter[] {
     return nodes.map((node, index) => {
         const type = index > 0 && node.boolean === 'or' ? ('or' as const) : undefined
@@ -72,7 +78,9 @@ function filters(nodes: FilterNode[]): LomkitFilter[] {
                       value:
                           node.operator === 'like' || node.operator === 'not like'
                               ? containsPattern(String(node.value))
-                              : node.value,
+                              : Array.isArray(node.value)
+                                ? node.value.map(scalar)
+                                : scalar(node.value),
                   }
         return type ? { ...base, type } : base
     })
@@ -94,7 +102,7 @@ function include(item: Include): LomkitInclude {
 function search(query: Query): LomkitSearch {
     const result: LomkitSearch = {}
     if (query.filters.length > 0) result.filters = filters(query.filters)
-    if (query.sorts.length > 0) result.sorts = query.sorts.map(sort => ({ ...sort }))
+    if (query.sorts.length > 0) result.sorts = query.sorts.map(sort => ({ field: sort.field, direction: sort.direction }))
     if (query.selects.length > 0) result.selects = query.selects.map(field => ({ field }))
     if (query.includes.length > 0) result.includes = query.includes.map(include)
     if (query.aggregates.length > 0) result.aggregates = query.aggregates.map(aggregate)
@@ -105,6 +113,5 @@ function search(query: Query): LomkitSearch {
 }
 
 export function toLomkit(query: Query): LomkitPayload {
-    assertQuery(query)
-    return { search: search(query) }
+    return { search: search(prepareQuery(query)) }
 }

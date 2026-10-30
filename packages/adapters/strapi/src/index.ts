@@ -1,4 +1,4 @@
-import { assertQuery, groupByOr, parseLike } from 'dialectr'
+import { getExtension, groupByOr, parseLike, prepareQuery } from 'dialectr'
 import type { Condition, FilterNode, Query } from 'dialectr'
 
 export const STRAPI_TARGET = 'strapi'
@@ -78,7 +78,8 @@ function expression(nodes: FilterNode[]): StrapiFilter {
 function isPlain(inner: Query): boolean {
     return (
         inner.search === undefined &&
-        inner.extensions?.[STRAPI_TARGET] === undefined &&
+        getExtension(inner, STRAPI_TARGET) === undefined &&
+        inner.aggregates.length === 0 &&
         inner.filters.length === 0 &&
         inner.sorts.length === 0 &&
         inner.selects.length === 0 &&
@@ -90,7 +91,7 @@ function isPlain(inner: Query): boolean {
 
 function params(query: Query): StrapiParams {
     if (query.search !== undefined) throw new Error('Strapi does not support free-text search')
-    if (query.extensions?.[STRAPI_TARGET] !== undefined) throw new Error('Strapi does not support extensions')
+    if (getExtension(query, STRAPI_TARGET) !== undefined) throw new Error('Strapi does not support extensions')
     if (query.aggregates.length > 0) throw new Error('Strapi does not support aggregates')
     const result: StrapiParams = {}
     if (query.filters.length > 0) result.filters = expression(query.filters)
@@ -114,6 +115,5 @@ function params(query: Query): StrapiParams {
 }
 
 export function toStrapi(query: Query): StrapiParams {
-    assertQuery(query)
-    return params(query)
+    return params(prepareQuery(query))
 }

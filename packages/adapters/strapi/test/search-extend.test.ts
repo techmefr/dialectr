@@ -8,7 +8,19 @@ describe('toStrapi search and extend', () => {
     })
 
     it('throws on search inside an include', () => {
-        expect(() => toStrapi(query().include('posts', inner => inner.search('x')).build())).toThrow()
+        expect(() => toStrapi(query().include('posts', inner => inner.search('x')).build())).toThrow(/does not support free-text search/)
+    })
+
+    it('throws on an aggregate inside an include instead of dropping it', () => {
+        expect(() => toStrapi(query().include('posts', inner => inner.aggregate('count', 'likes')).build())).toThrow(
+            /does not support aggregates/,
+        )
+    })
+
+    it('ignores extensions of other adapters inside an include', () => {
+        expect(toStrapi(query().include('posts', inner => inner.extend('lomkit', { scopes: [] })).build())).toEqual({
+            populate: ['posts'],
+        })
     })
 
     it('throws on an extension aimed at strapi', () => {
@@ -16,7 +28,7 @@ describe('toStrapi search and extend', () => {
     })
 
     it('throws on a strapi extension inside an include', () => {
-        expect(() => toStrapi(query().include('posts', inner => inner.extend('strapi', 1)).build())).toThrow()
+        expect(() => toStrapi(query().include('posts', inner => inner.extend('strapi', 1)).build())).toThrow(/does not support extensions/)
     })
 
     it('ignores extensions aimed at other adapters', () => {

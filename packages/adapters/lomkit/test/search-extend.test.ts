@@ -42,19 +42,34 @@ describe('toLomkit search and extend', () => {
 
     it('rejects unknown extension keys and keys that would override the core', () => {
         expect(() => toLomkit(query().extend('lomkit', { filters: [] }).build())).toThrow(/Unsupported lomkit extension key/)
-        expect(() => toLomkit(query().extend('lomkit', { limit: 1 }).build())).toThrow()
-        expect(() => toLomkit(query().extend('lomkit', { nope: [] }).build())).toThrow()
+        expect(() => toLomkit(query().extend('lomkit', { limit: 1 }).build())).toThrow(/Unsupported lomkit extension key: "limit"/)
+        expect(() => toLomkit(query().extend('lomkit', { nope: [] }).build())).toThrow(/Unsupported lomkit extension key: "nope"/)
     })
 
     it('rejects non-object and non-array extension values', () => {
-        expect(() => toLomkit(query().extend('lomkit', 1).build())).toThrow()
-        expect(() => toLomkit(query().extend('lomkit', [1]).build())).toThrow()
-        expect(() => toLomkit(query().extend('lomkit', { scopes: 'x' }).build())).toThrow()
+        expect(() => toLomkit(query().extend('lomkit', 1).build())).toThrow(/lomkit extension must be an object/)
+        expect(() => toLomkit(query().extend('lomkit', [1]).build())).toThrow(/lomkit extension must be an object/)
+        expect(() => toLomkit(query().extend('lomkit', { scopes: 'x' }).build())).toThrow(/"scopes" must be an array/)
+    })
+
+    it('merges lomkit extensions inside an include', () => {
+        const payload = toLomkit(
+            query()
+                .include('posts', inner => inner.extend('lomkit', { scopes: [{ name: 'published' }] }))
+                .build(),
+        )
+        expect(payload.search.includes).toStrictEqual([{ relation: 'posts', scopes: [{ name: 'published' }] }])
+    })
+
+    it('rejects an invalid lomkit extension inside an include', () => {
+        expect(() => toLomkit(query().include('posts', inner => inner.extend('lomkit', { nope: [] })).build())).toThrow(
+            /Unsupported lomkit extension key: "nope"/,
+        )
     })
 
     it('rejects __proto__ injection through a hand-made query', () => {
         const extensions = JSON.parse('{"lomkit":{"__proto__":{"polluted":true}}}')
-        expect(() => toLomkit(raw({ extensions }))).toThrow()
+        expect(() => toLomkit(raw({ extensions }))).toThrow(/Forbidden extension key/)
         expect(({} as Record<string, unknown>).polluted).toBeUndefined()
     })
 
