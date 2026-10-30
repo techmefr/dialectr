@@ -1,0 +1,30 @@
+{
+    "name": "dialectr",
+    "version": "0.0.1",
+    "description": "Universal, dependency-free query builder. Describe a query once, compile it for any backend.",
+    "type": "module",
+    "license": "MIT",
+    "author": "techmefr",
+    "sideEffects": false,
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.mjs",
+            "default": "./dist/index.mjs"
+        }
+    },
+    "main": "./dist/index.mjs",
+    "types": "./dist/index.d.ts",
+    "files": ["dist"],
+    "publishConfig": { "access": "public" },
+    "scripts": {
+        "build": "unbuild",
+        "test": "vitest run",
+        "dev": "unbuild --stub"
+    },
+    "devDependencies": {
+        "typescript": "^5.9.3",
+        "unbuild": "^3.6.1",
+        "vitest": "^5.0.5"
+    }
+}
