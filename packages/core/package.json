@@ -16,6 +16,7 @@
     "main": "./dist/index.mjs",
     "types": "./dist/index.d.ts",
     "files": ["dist"],
+    "engines": { "node": ">=18" },
     "publishConfig": { "access": "public" },
     "scripts": {
         "build": "unbuild",

@@ -16,13 +16,14 @@
     "main": "./dist/index.mjs",
     "types": "./dist/index.d.ts",
     "files": ["dist"],
+    "engines": { "node": ">=18" },
     "publishConfig": { "access": "public" },
     "scripts": {
         "build": "unbuild",
         "test": "vitest run",
         "dev": "unbuild --stub"
     },
-    "peerDependencies": { "dialectr": "workspace:*" },
+    "peerDependencies": { "dialectr": "workspace:^" },
     "devDependencies": {
         "dialectr": "workspace:*",
         "typescript": "^5.9.3",
