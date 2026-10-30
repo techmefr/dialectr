@@ -1,3 +1,4 @@
+import { assertQuery, containsPattern } from 'dialectr'
 import type { Aggregate, FilterNode, Include, Query } from 'dialectr'
 
 export interface LomkitFilter {
@@ -8,14 +9,25 @@ export interface LomkitFilter {
     nested?: LomkitFilter[]
 }
 
+export interface LomkitAggregate {
+    relation: string
+    type: string
+    field?: string
+    filters?: LomkitFilter[]
+}
+
 export interface LomkitSearch {
     filters?: LomkitFilter[]
     sorts?: Array<{ field: string; direction: 'asc' | 'desc' }>
     selects?: Array<{ field: string }>
-    includes?: Array<{ relation: string } & Omit<LomkitSearch, 'includes' | 'aggregates'> & { limit?: number }>
-    aggregates?: Array<{ relation: string; type: string; field?: string; filters?: LomkitFilter[] }>
+    includes?: LomkitInclude[]
+    aggregates?: LomkitAggregate[]
     limit?: number
     page?: number
+}
+
+export interface LomkitInclude extends LomkitSearch {
+    relation: string
 }
 
 export interface LomkitPayload {
@@ -28,12 +40,19 @@ function filters(nodes: FilterNode[]): LomkitFilter[] {
         const base: LomkitFilter =
             node.kind === 'group'
                 ? { nested: filters(node.nodes) }
-                : { field: node.field, operator: node.operator, value: node.value }
+                : {
+                      field: node.field,
+                      operator: node.operator,
+                      value:
+                          node.operator === 'like' || node.operator === 'not like'
+                              ? containsPattern(String(node.value))
+                              : node.value,
+                  }
         return type ? { ...base, type } : base
     })
 }
 
-function aggregate(item: Aggregate): NonNullable<LomkitSearch['aggregates']>[number] {
+function aggregate(item: Aggregate): LomkitAggregate {
     return {
         relation: item.relation,
         type: item.type,
@@ -42,7 +61,7 @@ function aggregate(item: Aggregate): NonNullable<LomkitSearch['aggregates']>[num
     }
 }
 
-function include(item: Include): NonNullable<LomkitSearch['includes']>[number] {
+function include(item: Include): LomkitInclude {
     return { relation: item.relation, ...search(item.query) }
 }
 
@@ -59,5 +78,6 @@ function search(query: Query): LomkitSearch {
 }
 
 export function toLomkit(query: Query): LomkitPayload {
+    assertQuery(query)
     return { search: search(query) }
 }
