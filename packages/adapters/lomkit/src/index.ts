@@ -22,6 +22,10 @@ export interface LomkitSearch {
     selects?: Array<{ field: string }>
     includes?: LomkitInclude[]
     aggregates?: LomkitAggregate[]
+    text?: { value: string }
+    scopes?: unknown[]
+    instructions?: unknown[]
+    gates?: unknown[]
     limit?: number
     page?: number
 }
@@ -32,6 +36,28 @@ export interface LomkitInclude extends LomkitSearch {
 
 export interface LomkitPayload {
     search: LomkitSearch
+}
+
+export const LOMKIT_TARGET = 'lomkit'
+
+const EXTENSION_KEYS = ['scopes', 'instructions', 'gates'] as const
+
+function extension(query: Query): Partial<LomkitSearch> {
+    const value = query.extensions?.[LOMKIT_TARGET]
+    if (value === undefined) return {}
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+        throw new Error('The lomkit extension must be an object')
+    }
+    const result: Record<string, unknown> = {}
+    for (const key of Object.keys(value)) {
+        if (!(EXTENSION_KEYS as readonly string[]).includes(key)) {
+            throw new Error(`Unsupported lomkit extension key: "${key}"`)
+        }
+        const entry = (value as Record<string, unknown>)[key]
+        if (!Array.isArray(entry)) throw new Error(`The lomkit extension "${key}" must be an array`)
+        result[key] = entry
+    }
+    return result
 }
 
 function filters(nodes: FilterNode[]): LomkitFilter[] {
@@ -72,9 +98,10 @@ function search(query: Query): LomkitSearch {
     if (query.selects.length > 0) result.selects = query.selects.map(field => ({ field }))
     if (query.includes.length > 0) result.includes = query.includes.map(include)
     if (query.aggregates.length > 0) result.aggregates = query.aggregates.map(aggregate)
+    if (query.search !== undefined) result.text = { value: query.search }
     if (query.limit !== undefined) result.limit = query.limit
     if (query.page !== undefined) result.page = query.page
-    return result
+    return { ...result, ...extension(query) }
 }
 
 export function toLomkit(query: Query): LomkitPayload {
