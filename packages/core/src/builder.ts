@@ -1,3 +1,13 @@
+import { cloneQuery, cloneValue } from './clone.ts'
+import {
+    assertDirection,
+    assertField,
+    assertLimit,
+    assertOperator,
+    assertPage,
+    assertQuery,
+    assertValue,
+} from './validate.ts'
 import type {
     Aggregate,
     AggregateType,
@@ -11,8 +21,6 @@ import type {
 
 export type Field<T> = Extract<keyof T, string>
 
-const OPERATORS: readonly Operator[] = ['=', '!=', '>', '>=', '<', '<=', 'like', 'not like', 'in', 'not in']
-
 const emptyQuery = (): Query => ({
     filters: [],
     sorts: [],
@@ -20,16 +28,6 @@ const emptyQuery = (): Query => ({
     includes: [],
     aggregates: [],
 })
-
-function assertOperator(operator: string): asserts operator is Operator {
-    if (!OPERATORS.includes(operator as Operator)) throw new Error(`Unknown operator: "${operator}"`)
-}
-
-function assertList(operator: Operator, value: unknown): void {
-    if ((operator === 'in' || operator === 'not in') && !Array.isArray(value)) {
-        throw new Error(`Operator "${operator}" requires an array value`)
-    }
-}
 
 export class QueryBuilder<T extends object = Record<string, unknown>> {
     readonly #query: Query
@@ -59,10 +57,13 @@ export class QueryBuilder<T extends object = Record<string, unknown>> {
     }
 
     sort(field: Field<T>, direction: SortDirection = 'asc'): QueryBuilder<T> {
+        assertField(field)
+        assertDirection(direction)
         return this.#next({ sorts: [...this.#query.sorts, { field, direction }] })
     }
 
     select(...fields: Array<Field<T>>): QueryBuilder<T> {
+        fields.forEach(assertField)
         return this.#next({ selects: [...this.#query.selects, ...fields] })
     }
 
@@ -70,6 +71,7 @@ export class QueryBuilder<T extends object = Record<string, unknown>> {
         relation: string,
         callback?: (builder: QueryBuilder) => QueryBuilder,
     ): QueryBuilder<T> {
+        assertField(relation)
         const query = callback ? callback(new QueryBuilder()).build() : emptyQuery()
         const include: Include = { relation, query }
         return this.#next({ includes: [...this.#query.includes, include] })
@@ -80,23 +82,31 @@ export class QueryBuilder<T extends object = Record<string, unknown>> {
         relation: string,
         options: { field?: string; where?: (builder: QueryBuilder) => QueryBuilder } = {},
     ): QueryBuilder<T> {
+        assertField(relation)
+        if (options.field !== undefined) assertField(options.field)
         const filters = options.where ? options.where(new QueryBuilder()).build().filters : []
-        const aggregate: Aggregate = { type, relation, field: options.field, filters }
+        const aggregate: Aggregate = {
+            type,
+            relation,
+            ...(options.field === undefined ? {} : { field: options.field }),
+            filters,
+        }
         return this.#next({ aggregates: [...this.#query.aggregates, aggregate] })
     }
 
     limit(limit: number): QueryBuilder<T> {
-        if (!Number.isInteger(limit) || limit < 1) throw new Error('limit must be a positive integer')
+        assertLimit(limit)
         return this.#next({ limit })
     }
 
     page(page: number): QueryBuilder<T> {
-        if (!Number.isInteger(page) || page < 1) throw new Error('page must be a positive integer')
+        assertPage(page)
         return this.#next({ page })
     }
 
     build(): Query {
-        return structuredClone(this.#query)
+        assertQuery(this.#query)
+        return cloneQuery(this.#query)
     }
 
     #next(patch: Partial<Query>): QueryBuilder<T> {
@@ -111,11 +121,18 @@ export class QueryBuilder<T extends object = Record<string, unknown>> {
         argumentCount: number,
     ): QueryBuilder<T> {
         const hasOperator = argumentCount >= 3
-        const operator: Operator = hasOperator ? (operatorOrValue as Operator) : '='
+        const operator = hasOperator ? operatorOrValue : '='
         const value = hasOperator ? maybeValue : operatorOrValue
+        assertField(field)
         assertOperator(operator)
-        assertList(operator, value)
-        const node: FilterNode = { kind: 'condition', boolean, field, operator, value }
+        assertValue(operator, value)
+        const node: FilterNode = {
+            kind: 'condition',
+            boolean,
+            field,
+            operator: operator as Operator,
+            value: cloneValue(value),
+        }
         return this.#next({ filters: [...this.#query.filters, node] })
     }
 
