@@ -172,7 +172,7 @@ describe('like helpers', () => {
 describe('package', () => {
     it('exposes the built entry through the exports map', async () => {
         const manifest = packageJson
-        expect(manifest.engines.node).toBe('>=18')
+        expect(manifest.engines.node).toBe('>=22')
         const entry = new URL(`../${manifest.exports['.'].import}`, import.meta.url).href
         const built = await import(entry)
         expect(typeof built.query).toBe('function')
