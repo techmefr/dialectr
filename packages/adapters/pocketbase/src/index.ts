@@ -1,6 +1,8 @@
 import { assertQuery, containsPattern, groupByOr } from 'dialectr'
 import type { Condition, FilterNode, Query } from 'dialectr'
 
+export const POCKETBASE_TARGET = 'pocketbase'
+
 export interface PocketbaseParams {
     filter?: string
     sort?: string
@@ -65,6 +67,8 @@ function expression(nodes: FilterNode[]): string {
 export function toPocketbase(query: Query): PocketbaseParams {
     assertQuery(query)
     if (query.aggregates.length > 0) throw new Error('PocketBase does not support aggregates')
+    if (query.search !== undefined) throw new Error('PocketBase does not support free-text search')
+    if (query.extensions?.[POCKETBASE_TARGET] !== undefined) throw new Error('PocketBase does not support extensions')
     const params: PocketbaseParams = {}
     if (query.filters.length > 0) params.filter = expression(query.filters)
     if (query.sorts.length > 0) {
@@ -80,6 +84,8 @@ export function toPocketbase(query: Query): PocketbaseParams {
                 inner.selects.length === 0 &&
                 inner.includes.length === 0 &&
                 inner.aggregates.length === 0 &&
+                inner.search === undefined &&
+                inner.extensions?.[POCKETBASE_TARGET] === undefined &&
                 inner.limit === undefined &&
                 inner.page === undefined
             if (!empty) throw new Error('PocketBase does not support constraints on expanded relations')

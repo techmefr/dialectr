@@ -1,7 +1,7 @@
 {
     "name": "dialectr-adapter-pocketbase",
     "version": "0.0.1",
-    "description": "dialectr adapter: compile a dialectr query for pocketbase.",
+    "description": "One query, every backend dialect. Zero-dependency query builder that compiles to lomkit, Strapi, PocketBase and more.",
     "type": "module",
     "license": "MIT",
     "author": "techmefr",
