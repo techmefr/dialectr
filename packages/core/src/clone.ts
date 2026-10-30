@@ -6,6 +6,23 @@ export function cloneValue<V>(value: V): V {
     return value
 }
 
+export function cloneExtensionValue(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(cloneExtensionValue)
+    if (value instanceof Date) return new Date(value.getTime())
+    if (value !== null && typeof value === 'object') {
+        const copy: Record<string, unknown> = {}
+        for (const key of Object.keys(value)) copy[key] = cloneExtensionValue((value as Record<string, unknown>)[key])
+        return copy
+    }
+    return value
+}
+
+function cloneExtensions(extensions: Record<string, unknown>): Record<string, unknown> {
+    const copy: Record<string, unknown> = {}
+    for (const key of Object.keys(extensions)) copy[key] = cloneExtensionValue(extensions[key])
+    return copy
+}
+
 function cloneNodes(nodes: FilterNode[]): FilterNode[] {
     return nodes.map(node =>
         node.kind === 'group'
@@ -32,6 +49,10 @@ export function cloneQuery(query: Query): Query {
             ...(aggregate.field === undefined ? {} : { field: aggregate.field }),
             filters: cloneNodes(aggregate.filters),
         })),
+        ...(query.search === undefined ? {} : { search: query.search }),
+        ...(query.extensions === undefined || Object.keys(query.extensions).length === 0
+            ? {}
+            : { extensions: cloneExtensions(query.extensions) }),
         ...(query.limit === undefined ? {} : { limit: query.limit }),
         ...(query.page === undefined ? {} : { page: query.page }),
     }

@@ -5,6 +5,9 @@ export const MAX_NODES = 1000
 export const MAX_LIMIT = 10000
 export const MAX_LIST = 10000
 export const MAX_FIELD_LENGTH = 256
+export const MAX_SEARCH_LENGTH = 1024
+
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
 
 const OPERATORS = new Set(['=', '!=', '>', '>=', '<', '<=', 'like', 'not like', 'in', 'not in'])
 const CONNECTORS = new Set(['and', 'or'])
@@ -67,7 +70,51 @@ export function assertDirection(direction: unknown): void {
     }
 }
 
-function spend(budget: Budget, count: number): void {
+export function assertSearch(text: unknown): void {
+    if (typeof text !== 'string' || text.trim().length === 0 || text.length > MAX_SEARCH_LENGTH) {
+        throw new Error(`Search text must be a non-empty string of at most ${MAX_SEARCH_LENGTH} characters`)
+    }
+}
+
+export function assertExtensionKey(key: unknown): void {
+    if (typeof key !== 'string' || key.length === 0 || key.length > MAX_FIELD_LENGTH) {
+        throw new Error('Extension targets must be non-empty strings of at most 256 characters')
+    }
+    if (FORBIDDEN_KEYS.has(key)) throw new Error(`Forbidden extension key: "${key}"`)
+}
+
+function checkExtensionValue(value: unknown, depth: number, budget: Budget): void {
+    if (depth > MAX_DEPTH) throw new Error(`Extension nesting exceeds ${MAX_DEPTH} levels`)
+    spend(budget, 1)
+    if (Array.isArray(value)) {
+        for (const item of value) checkExtensionValue(item, depth + 1, budget)
+        return
+    }
+    if (value !== null && typeof value === 'object') {
+        if (value instanceof Date) {
+            if (Number.isNaN(value.getTime())) throw new Error('Extension dates must be valid')
+            return
+        }
+        const prototype = Object.getPrototypeOf(value)
+        if (prototype !== Object.prototype && prototype !== null) throw new Error('Extension values must be plain objects')
+        for (const key of Object.keys(value)) {
+            assertExtensionKey(key)
+            checkExtensionValue((value as Record<string, unknown>)[key], depth + 1, budget)
+        }
+        return
+    }
+    if (typeof value === 'number' && !Number.isFinite(value)) throw new Error('Extension numbers must be finite')
+    if (value !== undefined && value !== null && typeof value !== 'string' && typeof value !== 'boolean' && typeof value !== 'number') {
+        throw new Error('Extension values must be JSON-like')
+    }
+}
+
+export function assertExtensionValue(value: unknown): void {
+    checkExtensionValue(value, 0, { nodes: 0 })
+}
+
+function spend(
+budget: Budget, count: number): void {
     budget.nodes += count
     if (budget.nodes > MAX_NODES) throw new Error(`Query exceeds ${MAX_NODES} nodes`)
 }
@@ -110,6 +157,16 @@ function checkQuery(query: Query, depth: number, budget: Budget): void {
             throw new Error(`Unknown aggregate type: "${String(aggregate.type)}"`)
         }
         checkFilters(aggregate.filters, depth, budget)
+    }
+    if (query.search !== undefined) assertSearch(query.search)
+    if (query.extensions !== undefined) {
+        if (query.extensions === null || typeof query.extensions !== 'object' || Array.isArray(query.extensions)) {
+            throw new Error('extensions must be an object')
+        }
+        for (const key of Object.keys(query.extensions)) {
+            assertExtensionKey(key)
+            assertExtensionValue(query.extensions[key])
+        }
     }
     if (query.limit !== undefined) assertLimit(query.limit)
     if (query.page !== undefined) assertPage(query.page)

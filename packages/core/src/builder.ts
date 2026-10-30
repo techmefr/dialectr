@@ -1,16 +1,20 @@
-import { cloneQuery, cloneValue } from './clone.ts'
+import { cloneExtensionValue, cloneQuery, cloneValue } from './clone.ts'
 import {
     assertDirection,
+    assertExtensionKey,
+    assertExtensionValue,
     assertField,
     assertLimit,
     assertOperator,
     assertPage,
     assertQuery,
+    assertSearch,
     assertValue,
 } from './validate.ts'
 import type {
     Aggregate,
     AggregateType,
+    Compiler,
     Connector,
     FilterNode,
     Include,
@@ -92,6 +96,22 @@ export class QueryBuilder<T extends object = Record<string, unknown>> {
             filters,
         }
         return this.#next({ aggregates: [...this.#query.aggregates, aggregate] })
+    }
+
+    search(text: string): QueryBuilder<T> {
+        assertSearch(text)
+        return this.#next({ search: text })
+    }
+
+    extend(target: string, value: unknown): QueryBuilder<T> {
+        assertExtensionKey(target)
+        assertExtensionValue(value)
+        const extensions = { ...(this.#query.extensions ?? {}), [target]: cloneExtensionValue(value) }
+        return this.#next({ extensions })
+    }
+
+    to<TOutput>(compiler: Compiler<TOutput>): TOutput {
+        return compiler(this.build())
     }
 
     limit(limit: number): QueryBuilder<T> {

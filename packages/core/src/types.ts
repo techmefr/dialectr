@@ -45,6 +45,10 @@ export interface Query {
     selects: string[]
     includes: Include[]
     aggregates: Aggregate[]
+    search?: string
+    extensions?: Record<string, unknown>
     limit?: number
     page?: number
 }
+
+export type Compiler<TOutput> = (query: Query) => TOutput

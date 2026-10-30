@@ -1,7 +1,7 @@
 {
     "name": "dialectr",
     "version": "0.0.1",
-    "description": "Universal, dependency-free query builder. Describe a query once, compile it for any backend.",
+    "description": "One query, every backend dialect. Zero-dependency query builder that compiles to lomkit, Strapi, PocketBase and more.",
     "type": "module",
     "license": "MIT",
     "author": "techmefr",
