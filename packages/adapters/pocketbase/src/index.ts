@@ -1,4 +1,4 @@
-import { groupByOr } from 'dialectr'
+import { assertQuery, containsPattern, groupByOr } from 'dialectr'
 import type { Condition, FilterNode, Query } from 'dialectr'
 
 export interface PocketbaseParams {
@@ -10,16 +10,16 @@ export interface PocketbaseParams {
     perPage?: number
 }
 
-const OPERATORS: Record<string, string> = {
-    '=': '=',
-    '!=': '!=',
-    '>': '>',
-    '>=': '>=',
-    '<': '<',
-    '<=': '<=',
-    like: '~',
-    'not like': '!~',
-}
+const OPERATORS = new Map<string, string>([
+    ['=', '='],
+    ['!=', '!='],
+    ['>', '>'],
+    ['>=', '>='],
+    ['<', '<'],
+    ['<=', '<='],
+    ['like', '~'],
+    ['not like', '!~'],
+])
 
 const FIELD = /^[A-Za-z_][A-Za-z0-9_.:]*$/
 
@@ -30,9 +30,14 @@ function field(name: string): string {
 
 function literal(value: unknown): string {
     if (value === null || value === undefined) return 'null'
-    if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+    if (typeof value === 'boolean') return String(value)
+    if (typeof value === 'number') {
+        if (!Number.isFinite(value)) throw new Error('Numeric values must be finite')
+        return String(value)
+    }
     if (value instanceof Date) return `'${value.toISOString().replace('T', ' ')}'`
-    return `'${String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
+    if (typeof value === 'string') return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`
+    throw new Error('Values must be string, finite number, boolean, null or Date')
 }
 
 function condition(node: Condition): string {
@@ -44,7 +49,10 @@ function condition(node: Condition): string {
         const operator = node.operator === 'in' ? '=' : '!='
         return `(${values.map(value => `${name}${operator}${literal(value)}`).join(joiner)})`
     }
-    return `${name}${OPERATORS[node.operator]}${literal(node.value)}`
+    const operator = OPERATORS.get(node.operator)
+    if (operator === undefined) throw new Error(`Unknown operator: "${String(node.operator)}"`)
+    const value = node.operator === 'like' || node.operator === 'not like' ? containsPattern(String(node.value)) : node.value
+    return `${name}${operator}${literal(value)}`
 }
 
 function expression(nodes: FilterNode[]): string {
@@ -55,6 +63,7 @@ function expression(nodes: FilterNode[]): string {
 }
 
 export function toPocketbase(query: Query): PocketbaseParams {
+    assertQuery(query)
     if (query.aggregates.length > 0) throw new Error('PocketBase does not support aggregates')
     const params: PocketbaseParams = {}
     if (query.filters.length > 0) params.filter = expression(query.filters)
@@ -62,7 +71,21 @@ export function toPocketbase(query: Query): PocketbaseParams {
         params.sort = query.sorts.map(sort => `${sort.direction === 'desc' ? '-' : ''}${field(sort.field)}`).join(',')
     }
     if (query.selects.length > 0) params.fields = query.selects.map(field).join(',')
-    if (query.includes.length > 0) params.expand = query.includes.map(include => field(include.relation)).join(',')
+    if (query.includes.length > 0) {
+        for (const include of query.includes) {
+            const inner = include.query
+            const empty =
+                inner.filters.length === 0 &&
+                inner.sorts.length === 0 &&
+                inner.selects.length === 0 &&
+                inner.includes.length === 0 &&
+                inner.aggregates.length === 0 &&
+                inner.limit === undefined &&
+                inner.page === undefined
+            if (!empty) throw new Error('PocketBase does not support constraints on expanded relations')
+        }
+        params.expand = query.includes.map(include => field(include.relation)).join(',')
+    }
     if (query.page !== undefined) params.page = query.page
     if (query.limit !== undefined) params.perPage = query.limit
     return params
