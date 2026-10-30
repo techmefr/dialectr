@@ -1,4 +1,4 @@
-import { cloneExtensionValue, cloneQuery, cloneValue } from './clone.ts'
+import { cloneExtensionValue, cloneValue } from './clone.ts'
 import {
     assertDirection,
     assertExtensionKey,
@@ -7,9 +7,9 @@ import {
     assertLimit,
     assertOperator,
     assertPage,
-    assertQuery,
     assertSearch,
     assertValue,
+    prepareQuery,
 } from './validate.ts'
 import type {
     Aggregate,
@@ -33,11 +33,13 @@ const emptyQuery = (): Query => ({
     aggregates: [],
 })
 
+const trusted = new WeakSet<Query>()
+
 export class QueryBuilder<T extends object = Record<string, unknown>> {
     readonly #query: Query
 
     constructor(query: Query = emptyQuery()) {
-        this.#query = query
+        this.#query = trusted.has(query) ? query : prepareQuery(query)
     }
 
     where(field: Field<T>, value: unknown): QueryBuilder<T>
@@ -125,12 +127,13 @@ export class QueryBuilder<T extends object = Record<string, unknown>> {
     }
 
     build(): Query {
-        assertQuery(this.#query)
-        return cloneQuery(this.#query)
+        return prepareQuery(this.#query)
     }
 
     #next(patch: Partial<Query>): QueryBuilder<T> {
-        return new QueryBuilder<T>({ ...this.#query, ...patch })
+        const next: Query = { ...this.#query, ...patch }
+        trusted.add(next)
+        return new QueryBuilder<T>(next)
     }
 
     #condition(

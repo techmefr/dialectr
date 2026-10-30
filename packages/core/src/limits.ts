@@ -1,0 +1,9 @@
+export const MAX_DEPTH = 32
+export const MAX_NODES = 1000
+export const MAX_LIMIT = 10000
+export const MAX_PAGE = 1000000
+export const MAX_LIST = 10000
+export const MAX_FIELD_LENGTH = 256
+export const MAX_SEARCH_LENGTH = 1024
+export const MAX_VALUE_LENGTH = 4096
+export const MAX_EXTENSION_KEYS = 32

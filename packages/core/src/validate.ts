@@ -1,11 +1,28 @@
+import { cloneQuery } from './clone.ts'
+import {
+    MAX_DEPTH,
+    MAX_EXTENSION_KEYS,
+    MAX_FIELD_LENGTH,
+    MAX_LIMIT,
+    MAX_LIST,
+    MAX_NODES,
+    MAX_PAGE,
+    MAX_SEARCH_LENGTH,
+    MAX_VALUE_LENGTH,
+} from './limits.ts'
 import type { FilterNode, Query } from './types.ts'
 
-export const MAX_DEPTH = 32
-export const MAX_NODES = 1000
-export const MAX_LIMIT = 10000
-export const MAX_LIST = 10000
-export const MAX_FIELD_LENGTH = 256
-export const MAX_SEARCH_LENGTH = 1024
+export {
+    MAX_DEPTH,
+    MAX_EXTENSION_KEYS,
+    MAX_FIELD_LENGTH,
+    MAX_LIMIT,
+    MAX_LIST,
+    MAX_NODES,
+    MAX_PAGE,
+    MAX_SEARCH_LENGTH,
+    MAX_VALUE_LENGTH,
+}
 
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
 
@@ -20,10 +37,16 @@ interface Budget {
 
 export function isScalar(value: unknown): boolean {
     if (value === null || value === undefined) return true
-    if (typeof value === 'string' || typeof value === 'boolean') return true
+    if (typeof value === 'string') return value.length <= MAX_VALUE_LENGTH
+    if (typeof value === 'boolean') return true
     if (typeof value === 'number') return Number.isFinite(value)
     if (value instanceof Date) return !Number.isNaN(value.getTime())
     return false
+}
+
+function spend(budget: Budget, count: number): void {
+    budget.nodes += count
+    if (budget.nodes > MAX_NODES) throw new Error(`Query exceeds ${MAX_NODES} nodes`)
 }
 
 export function assertOperator(operator: unknown): void {
@@ -36,19 +59,31 @@ export function assertField(name: unknown): void {
     }
 }
 
-export function assertValue(operator: unknown, value: unknown): void {
+export function assertValue(operator: unknown, value: unknown, budget: Budget = { nodes: 0 }): void {
     assertOperator(operator)
     if (operator === 'in' || operator === 'not in') {
         if (!Array.isArray(value)) throw new Error(`Operator "${operator}" requires an array value`)
-        if (value.length > MAX_LIST) throw new Error(`List values are limited to ${MAX_LIST} items`)
-        if (!value.every(isScalar)) throw new Error('List items must be string, finite number, boolean, null or Date')
+        const length = value.length
+        if (length > MAX_LIST) throw new Error(`List values are limited to ${MAX_LIST} items`)
+        spend(budget, length)
+        for (let index = 0; index < length; index++) {
+            if (!Object.hasOwn(value, index)) throw new Error('Sparse arrays are not allowed')
+            if (!isScalar(value[index])) {
+                throw new Error(
+                    `List items must be string of at most ${MAX_VALUE_LENGTH} characters, finite number, boolean, null or Date`,
+                )
+            }
+        }
         return
     }
     if (operator === 'like' || operator === 'not like') {
         if (typeof value !== 'string') throw new Error(`Operator "${operator}" requires a string value`)
+        if (value.length > MAX_VALUE_LENGTH) throw new Error(`Like patterns are limited to ${MAX_VALUE_LENGTH} characters`)
         return
     }
-    if (!isScalar(value)) throw new Error('Values must be string, finite number, boolean, null or Date')
+    if (!isScalar(value)) {
+        throw new Error(`Values must be string of at most ${MAX_VALUE_LENGTH} characters, finite number, boolean, null or Date`)
+    }
 }
 
 export function assertLimit(limit: unknown): void {
@@ -62,6 +97,7 @@ export function assertPage(page: unknown): void {
     if (typeof page !== 'number' || !Number.isSafeInteger(page) || page < 1) {
         throw new Error('page must be a positive integer')
     }
+    if (page > MAX_PAGE) throw new Error(`page must not exceed ${MAX_PAGE}`)
 }
 
 export function assertDirection(direction: unknown): void {
@@ -83,27 +119,42 @@ export function assertExtensionKey(key: unknown): void {
     if (FORBIDDEN_KEYS.has(key)) throw new Error(`Forbidden extension key: "${key}"`)
 }
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
+    const prototype = Object.getPrototypeOf(value)
+    return prototype === Object.prototype || prototype === null
+}
+
 function checkExtensionValue(value: unknown, depth: number, budget: Budget): void {
     if (depth > MAX_DEPTH) throw new Error(`Extension nesting exceeds ${MAX_DEPTH} levels`)
     spend(budget, 1)
     if (Array.isArray(value)) {
-        for (const item of value) checkExtensionValue(item, depth + 1, budget)
+        const length = value.length
+        spend(budget, length)
+        for (let index = 0; index < length; index++) {
+            if (!Object.hasOwn(value, index)) throw new Error('Sparse arrays are not allowed')
+            checkExtensionValue(value[index], depth + 1, budget)
+        }
+        return
+    }
+    if (value instanceof Date) {
+        if (Number.isNaN(value.getTime())) throw new Error('Extension dates must be valid')
         return
     }
     if (value !== null && typeof value === 'object') {
-        if (value instanceof Date) {
-            if (Number.isNaN(value.getTime())) throw new Error('Extension dates must be valid')
-            return
-        }
-        const prototype = Object.getPrototypeOf(value)
-        if (prototype !== Object.prototype && prototype !== null) throw new Error('Extension values must be plain objects')
-        for (const key of Object.keys(value)) {
+        if (!isPlainRecord(value)) throw new Error('Extension values must be plain objects')
+        const keys = Object.keys(value)
+        spend(budget, keys.length)
+        for (const key of keys) {
             assertExtensionKey(key)
-            checkExtensionValue((value as Record<string, unknown>)[key], depth + 1, budget)
+            checkExtensionValue(value[key], depth + 1, budget)
         }
         return
     }
     if (typeof value === 'number' && !Number.isFinite(value)) throw new Error('Extension numbers must be finite')
+    if (typeof value === 'string' && value.length > MAX_VALUE_LENGTH) {
+        throw new Error(`Extension strings are limited to ${MAX_VALUE_LENGTH} characters`)
+    }
     if (value !== undefined && value !== null && typeof value !== 'string' && typeof value !== 'boolean' && typeof value !== 'number') {
         throw new Error('Extension values must be JSON-like')
     }
@@ -111,12 +162,6 @@ function checkExtensionValue(value: unknown, depth: number, budget: Budget): voi
 
 export function assertExtensionValue(value: unknown): void {
     checkExtensionValue(value, 0, { nodes: 0 })
-}
-
-function spend(
-budget: Budget, count: number): void {
-    budget.nodes += count
-    if (budget.nodes > MAX_NODES) throw new Error(`Query exceeds ${MAX_NODES} nodes`)
 }
 
 function checkFilters(nodes: FilterNode[], depth: number, budget: Budget): void {
@@ -130,7 +175,7 @@ function checkFilters(nodes: FilterNode[], depth: number, budget: Budget): void 
             checkFilters(node.nodes, depth + 1, budget)
         } else if (node.kind === 'condition') {
             assertField(node.field)
-            assertValue(node.operator, node.value)
+            assertValue(node.operator, node.value, budget)
         } else {
             throw new Error('Unknown filter node kind')
         }
@@ -160,18 +205,25 @@ function checkQuery(query: Query, depth: number, budget: Budget): void {
     }
     if (query.search !== undefined) assertSearch(query.search)
     if (query.extensions !== undefined) {
-        if (query.extensions === null || typeof query.extensions !== 'object' || Array.isArray(query.extensions)) {
-            throw new Error('extensions must be an object')
-        }
-        for (const key of Object.keys(query.extensions)) {
+        if (!isPlainRecord(query.extensions)) throw new Error('extensions must be an object')
+        const keys = Object.keys(query.extensions)
+        if (keys.length > MAX_EXTENSION_KEYS) throw new Error(`Extensions are limited to ${MAX_EXTENSION_KEYS} targets`)
+        spend(budget, keys.length)
+        for (const key of keys) {
             assertExtensionKey(key)
-            assertExtensionValue(query.extensions[key])
+            checkExtensionValue(query.extensions[key], 1, budget)
         }
     }
     if (query.limit !== undefined) assertLimit(query.limit)
     if (query.page !== undefined) assertPage(query.page)
 }
 
-export function assertQuery(query: Query): void {
-    checkQuery(query, 0, { nodes: 0 })
+export function prepareQuery(query: Query): Query {
+    const snapshot = cloneQuery(query)
+    checkQuery(snapshot, 0, { nodes: 0 })
+    return snapshot
+}
+
+export function assertQuery(query: Query): Query {
+    return prepareQuery(query)
 }
