@@ -1,0 +1,33 @@
+{
+  "name": "dialectr",
+  "version": "0.0.0",
+  "description": "One query, every backend dialect. Zero-dependency query builder that compiles to lomkit, Strapi, PocketBase and more.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./lomkit": {
+      "types": "./dist/lomkit.d.mts",
+      "import": "./dist/lomkit.mjs"
+    }
+  },
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "unbuild",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "unbuild": "^3.6.0",
+    "vitest": "^3.2.0"
+  }
+}
