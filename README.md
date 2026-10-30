@@ -1,6 +1,6 @@
 # dialectr
 
-Universal query builder. Describe a query once, compile it for any backend.
+One query, every backend dialect. Zero-dependency query builder that compiles to lomkit, Strapi, PocketBase and more.
 
 ```ts
 import { query } from 'dialectr'
@@ -38,6 +38,9 @@ An adapter is a pure function from a `Query` to the backend's native parameters.
 - `where(field, value)` / `where(field, operator, value)` / `orWhere(...)`
 - `whereGroup(cb)` / `orWhereGroup(cb)` for nested conditions
 - `sort(field, direction?)`, `select(...fields)`, `limit(n)`, `page(n)`
+- `search(text)` sets free-text search (non-empty, at most 1024 characters)
+- `extend(target, value)` attaches a backend-specific payload, see Extensions
+- `to(compiler)` runs any `Compiler<TOutput>` (`(query: Query) => TOutput`) on the built query, e.g. `query().to(toLomkit)`
 - `include(relation, cb?)`, `aggregate(type, relation, { field?, where? })`
 - `build()` returns a plain, serializable `Query`
 
@@ -45,7 +48,22 @@ Operators: `=` `!=` `>` `>=` `<` `<=` `like` `not like` `in` `not in`. The build
 
 `AND` binds tighter than `OR`, as in SQL. An adapter that cannot express something (for example aggregates on PocketBase or Strapi) throws instead of dropping it silently.
 
+## Search and extensions
+
+`search(text)` stores free text on the query. Lomkit sends it as `search.text = { value }`. PocketBase and Strapi have no equivalent and throw "does not support free-text search".
+
+`extend(target, value)` is the escape hatch for backend-specific options. The target is an adapter name: `lomkit`, `pocketbase` or `strapi`. An adapter only reads its own target and ignores the others without error, so one query can carry options for several backends.
+
+```ts
+query().where('age', '>=', 18).extend('lomkit', { scopes: [{ name: 'active' }] }).to(toLomkit)
+```
+
+- Lomkit merges `extensions.lomkit` into the search. Accepted keys: `scopes`, `instructions`, `gates` (arrays). Any other key, including core ones such as `filters` or `limit`, throws.
+- PocketBase and Strapi have nothing to merge: an extension aimed at them throws.
+- Targets and nested keys named `__proto__`, `constructor` or `prototype` are rejected. Values must be JSON-like (plain objects, arrays, strings, finite numbers, booleans, null, valid dates) and are copied when stored and when built.
+
 ## Validation and limits
+
 
 Everything is validated when the query is built and again by each adapter, so a hand-made `Query` object gets the same checks.
 
