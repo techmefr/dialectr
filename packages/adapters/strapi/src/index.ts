@@ -1,4 +1,4 @@
-import { groupByOr } from 'dialectr'
+import { assertQuery, groupByOr, parseLike } from 'dialectr'
 import type { Condition, FilterNode, Query } from 'dialectr'
 
 export type StrapiFilter = Record<string, unknown>
@@ -11,33 +11,46 @@ export interface StrapiParams {
     pagination?: { page?: number; pageSize?: number }
 }
 
-const SIMPLE: Record<string, string> = {
-    '=': '$eq',
-    '!=': '$ne',
-    '>': '$gt',
-    '>=': '$gte',
-    '<': '$lt',
-    '<=': '$lte',
-    in: '$in',
-    'not in': '$notIn',
+const SIMPLE = new Map<string, string>([
+    ['=', '$eq'],
+    ['!=', '$ne'],
+    ['>', '$gt'],
+    ['>=', '$gte'],
+    ['<', '$lt'],
+    ['<=', '$lte'],
+    ['in', '$in'],
+    ['not in', '$notIn'],
+])
+
+const SEGMENT = /^[A-Za-z_][A-Za-z0-9_]*$/
+
+function path(name: string): string[] {
+    const segments = name.split('.')
+    for (const segment of segments) {
+        if (!SEGMENT.test(segment)) throw new Error(`Unsupported field name: "${name}"`)
+    }
+    return segments
 }
 
 function like(value: unknown): { operator: string; value: string } {
-    const text = String(value)
-    const start = text.startsWith('%')
-    const end = text.endsWith('%')
-    const core = text.slice(start ? 1 : 0, end ? -1 : undefined)
-    if (start && end) return { operator: '$containsi', value: core }
-    if (end) return { operator: '$startsWithi', value: core }
-    if (start) return { operator: '$endsWithi', value: core }
-    return { operator: '$eqi', value: core }
+    const { literal, leading, trailing, inner } = parseLike(String(value))
+    if (inner) throw new Error(`Strapi only supports a leading or trailing "%" in like patterns: "${String(value)}"`)
+    if (leading && trailing) return { operator: '$containsi', value: literal }
+    if (trailing) return { operator: '$startsWithi', value: literal }
+    if (leading) return { operator: '$endsWithi', value: literal }
+    return { operator: '$containsi', value: literal }
 }
 
-function nest(path: string, leaf: unknown): StrapiFilter {
-    return path
-        .split('.')
+function nest(name: string, leaf: unknown): StrapiFilter {
+    return path(name)
         .reverse()
         .reduce<unknown>((inner, key) => ({ [key]: inner }), leaf) as StrapiFilter
+}
+
+function scalar(value: unknown): unknown {
+    if (value === undefined) return null
+    if (value instanceof Date) return value.toISOString()
+    return value
 }
 
 function condition(node: Condition): StrapiFilter {
@@ -46,7 +59,10 @@ function condition(node: Condition): StrapiFilter {
         const leaf = { [operator]: value }
         return nest(node.field, node.operator === 'like' ? leaf : { $not: leaf })
     }
-    return nest(node.field, { [SIMPLE[node.operator]]: node.value })
+    const operator = SIMPLE.get(node.operator)
+    if (operator === undefined) throw new Error(`Unknown operator: "${String(node.operator)}"`)
+    const value = Array.isArray(node.value) ? node.value.map(scalar) : scalar(node.value)
+    return nest(node.field, { [operator]: value })
 }
 
 function expression(nodes: FilterNode[]): StrapiFilter {
@@ -57,31 +73,41 @@ function expression(nodes: FilterNode[]): StrapiFilter {
     return clusters.length === 1 ? clusters[0] : { $or: clusters }
 }
 
-export function toStrapi(query: Query): StrapiParams {
+function isPlain(inner: Query): boolean {
+    return (
+        inner.filters.length === 0 &&
+        inner.sorts.length === 0 &&
+        inner.selects.length === 0 &&
+        inner.includes.length === 0 &&
+        inner.limit === undefined &&
+        inner.page === undefined
+    )
+}
+
+function params(query: Query): StrapiParams {
     if (query.aggregates.length > 0) throw new Error('Strapi does not support aggregates')
-    const params: StrapiParams = {}
-    if (query.filters.length > 0) params.filters = expression(query.filters)
-    if (query.sorts.length > 0) params.sort = query.sorts.map(sort => `${sort.field}:${sort.direction}`)
-    if (query.selects.length > 0) params.fields = [...query.selects]
+    const result: StrapiParams = {}
+    if (query.filters.length > 0) result.filters = expression(query.filters)
+    if (query.sorts.length > 0) {
+        result.sort = query.sorts.map(sort => `${path(sort.field).join('.')}:${sort.direction}`)
+    }
+    if (query.selects.length > 0) result.fields = query.selects.map(name => path(name).join('.'))
     if (query.includes.length > 0) {
-        const plain = query.includes.every(
-            ({ query: inner }) =>
-                inner.filters.length === 0 &&
-                inner.sorts.length === 0 &&
-                inner.selects.length === 0 &&
-                inner.includes.length === 0 &&
-                inner.limit === undefined &&
-                inner.page === undefined,
-        )
-        params.populate = plain
-            ? query.includes.map(include => include.relation)
-            : Object.fromEntries(query.includes.map(include => [include.relation, toStrapi(include.query)]))
+        const relations = query.includes.map(include => path(include.relation).join('.'))
+        result.populate = query.includes.every(include => isPlain(include.query))
+            ? relations
+            : Object.fromEntries(query.includes.map((include, index) => [relations[index], params(include.query)]))
     }
     if (query.page !== undefined || query.limit !== undefined) {
-        params.pagination = {
+        result.pagination = {
             ...(query.page === undefined ? {} : { page: query.page }),
             ...(query.limit === undefined ? {} : { pageSize: query.limit }),
         }
     }
-    return params
+    return result
+}
+
+export function toStrapi(query: Query): StrapiParams {
+    assertQuery(query)
+    return params(query)
 }
