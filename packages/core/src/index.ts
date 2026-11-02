@@ -1,5 +1,5 @@
 export { QueryBuilder, query } from './builder.ts'
-export type { Field } from './builder.ts'
+export type { ComparisonOperator, Field, FieldValue } from './builder.ts'
 export { getExtension, groupByOr } from './normalize.ts'
 export { containsPattern, escapeLike, parseLike } from './like.ts'
 export type { LikePattern } from './like.ts'

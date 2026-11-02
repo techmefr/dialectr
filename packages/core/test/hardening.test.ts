@@ -51,7 +51,7 @@ describe('validation', () => {
         expect(() => query().where('a', () => 1)).toThrow('Values must be')
         expect(() => query().where('a', new Date('nope'))).toThrow('Values must be')
         expect(() => query().where('a', 'in', [{}])).toThrow('List items')
-        expect(() => query().where('a', 'like', 1)).toThrow('requires a string')
+        expect(() => query().where('a', 'like', 1 as never)).toThrow('requires a string')
     })
 
     it('accepts null, undefined, Date and booleans', () => {

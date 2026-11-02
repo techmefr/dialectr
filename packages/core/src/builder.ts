@@ -25,6 +25,10 @@ import type {
 
 export type Field<T> = Extract<keyof T, string>
 
+export type FieldValue<T, K extends Field<T>> = Exclude<T[K], undefined>
+
+export type ComparisonOperator = '=' | '!=' | '>' | '>=' | '<' | '<='
+
 const emptyQuery = (): Query => ({
     filters: [],
     sorts: [],
@@ -42,14 +46,18 @@ export class QueryBuilder<T extends object = Record<string, unknown>> {
         this.#query = trusted.has(query) ? query : prepareQuery(query)
     }
 
-    where(field: Field<T>, value: unknown): QueryBuilder<T>
-    where(field: Field<T>, operator: Operator, value: unknown): QueryBuilder<T>
+    where<K extends Field<T>>(field: K, value: FieldValue<T, K>): QueryBuilder<T>
+    where<K extends Field<T>>(field: K, operator: ComparisonOperator, value: FieldValue<T, K>): QueryBuilder<T>
+    where<K extends Field<T>>(field: K, operator: 'in' | 'not in', value: Array<FieldValue<T, K>>): QueryBuilder<T>
+    where(field: Field<T>, operator: 'like' | 'not like', value: string): QueryBuilder<T>
     where(field: Field<T>, operatorOrValue: unknown, maybeValue?: unknown): QueryBuilder<T> {
         return this.#condition('and', field, operatorOrValue, maybeValue, arguments.length)
     }
 
-    orWhere(field: Field<T>, value: unknown): QueryBuilder<T>
-    orWhere(field: Field<T>, operator: Operator, value: unknown): QueryBuilder<T>
+    orWhere<K extends Field<T>>(field: K, value: FieldValue<T, K>): QueryBuilder<T>
+    orWhere<K extends Field<T>>(field: K, operator: ComparisonOperator, value: FieldValue<T, K>): QueryBuilder<T>
+    orWhere<K extends Field<T>>(field: K, operator: 'in' | 'not in', value: Array<FieldValue<T, K>>): QueryBuilder<T>
+    orWhere(field: Field<T>, operator: 'like' | 'not like', value: string): QueryBuilder<T>
     orWhere(field: Field<T>, operatorOrValue: unknown, maybeValue?: unknown): QueryBuilder<T> {
         return this.#condition('or', field, operatorOrValue, maybeValue, arguments.length)
     }
