@@ -153,7 +153,7 @@ describe('toLomkit hardening', () => {
     it('resolves the published entry through the exports map', async () => {
         const manifest = packageJson
         expect(manifest.engines.node).toBe('>=22')
-        expect(manifest.peerDependencies.dialectr).toBe('workspace:^')
+        expect(manifest.peerDependencies.dialectr).toBe('>=0.0.1 <1')
         const entry = new URL(`../${manifest.exports['.'].import}`, import.meta.url).href
         const built = await import(entry)
         expect(built.toLomkit(query().where('a', 1).build())).toEqual({

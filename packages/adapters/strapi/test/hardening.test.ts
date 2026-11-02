@@ -144,7 +144,7 @@ describe('toStrapi hardening', () => {
     it('resolves the published entry through the exports map', async () => {
         const manifest = packageJson
         expect(manifest.engines.node).toBe('>=22')
-        expect(manifest.peerDependencies.dialectr).toBe('workspace:^')
+        expect(manifest.peerDependencies.dialectr).toBe('>=0.0.1 <1')
         const entry = new URL(`../${manifest.exports['.'].import}`, import.meta.url).href
         const built = await import(entry)
         expect(built.toStrapi(query().where('a', 1).build()).filters).toEqual({ a: { $eq: 1 } })
