@@ -8,5 +8,27 @@
         "build": "pnpm -r build",
         "test": "pnpm -r test",
         "typecheck": "pnpm -r exec tsc --noEmit"
-    }
+    },
+    "description": "One query, any dialect. Zero-dependency TypeScript query builder compiling to Lomkit, PocketBase and Strapi.",
+    "homepage": "https://techmefr.github.io/dialectr/",
+    "keywords": [
+        "dialectr",
+        "query-builder",
+        "query",
+        "typescript",
+        "fluent-api",
+        "immutable",
+        "query-ast",
+        "compiler",
+        "backend",
+        "adapter",
+        "filters",
+        "pagination",
+        "lomkit",
+        "laravel",
+        "pocketbase",
+        "strapi",
+        "nexdk",
+        "zero-dependencies"
+    ]
 }

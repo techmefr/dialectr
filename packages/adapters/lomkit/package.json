@@ -10,7 +10,7 @@
         "url": "git+https://github.com/techmefr/dialectr.git",
         "directory": "packages/adapters/lomkit"
     },
-    "homepage": "https://github.com/techmefr/dialectr#readme",
+    "homepage": "https://techmefr.github.io/dialectr/guides/adapters/",
     "bugs": {
         "url": "https://github.com/techmefr/dialectr/issues"
     },
@@ -19,7 +19,10 @@
         "lomkit",
         "laravel",
         "query-builder",
-        "rest-api"
+        "rest-api",
+        "typescript",
+        "adapter",
+        "compiler"
     ],
     "sideEffects": false,
     "exports": {

@@ -1,6 +1,26 @@
+<p align="center">
+  <a href="https://techmefr.github.io/dialectr/"><img src="docs/public/banner.svg" alt="dialectr — One query, any dialect" width="100%"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/techmefr/dialectr/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/techmefr/dialectr/ci.yml?branch=main&amp;style=flat-square"></a>
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-typed-3178c6?style=flat-square">
+  <img alt="Zero runtime dependencies" src="https://img.shields.io/badge/core-zero%20dependencies-f47732?style=flat-square">
+  <a href="LICENSE"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square"></a>
+</p>
+
+<p align="center">
+  <a href="https://techmefr.github.io/dialectr/"><b>Documentation</b></a> ·
+  <a href="https://techmefr.github.io/dialectr/guides/query-builder/">Query builder</a> ·
+  <a href="https://techmefr.github.io/dialectr/guides/adapters/">Adapters</a> ·
+  <a href="https://techmefr.github.io/dialectr/guides/write-your-own-adapter/">Write an adapter</a>
+</p>
+
 # dialectr
 
-One query, every backend dialect. Zero-dependency query builder that compiles to lomkit, Strapi, PocketBase and more.
+**One query, any dialect**
+
+A zero-dependency TypeScript query builder. Compose typed, immutable queries and compile them to Lomkit, PocketBase or Strapi through independent adapters.
 
 ```ts
 import { query } from 'dialectr'
@@ -35,6 +55,8 @@ toStrapi(users)
 // { filters: { $or: [{ age: { $gte: 18 } }, { name: { $startsWithi: 'A' } }] },
 //   sort: ['name:asc'], pagination: { page: 2, pageSize: 20 } }
 ```
+
+> **Keywords** — query builder · TypeScript · fluent API · immutable queries · query AST · compiler · backend adapters · filters · pagination · Lomkit · Laravel · PocketBase · Strapi · neXdk
 
 ## Packages
 

@@ -1,7 +1,7 @@
 {
     "name": "dialectr",
     "version": "0.0.1",
-    "description": "One query, every backend dialect. Zero-dependency query builder that compiles to lomkit, Strapi, PocketBase and more.",
+    "description": "One query, any dialect. Zero-dependency TypeScript query builder compiling to Lomkit, PocketBase and Strapi.",
     "type": "module",
     "license": "MIT",
     "author": "techmefr",
@@ -10,7 +10,7 @@
         "url": "git+https://github.com/techmefr/dialectr.git",
         "directory": "packages/core"
     },
-    "homepage": "https://github.com/techmefr/dialectr#readme",
+    "homepage": "https://techmefr.github.io/dialectr/",
     "bugs": {
         "url": "https://github.com/techmefr/dialectr/issues"
     },
@@ -20,7 +20,20 @@
         "query",
         "filter",
         "backend",
-        "adapter"
+        "adapter",
+        "typescript",
+        "fluent-api",
+        "immutable",
+        "query-ast",
+        "compiler",
+        "filters",
+        "pagination",
+        "lomkit",
+        "laravel",
+        "pocketbase",
+        "strapi",
+        "nexdk",
+        "zero-dependencies"
     ],
     "sideEffects": false,
     "exports": {

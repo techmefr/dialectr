@@ -10,7 +10,7 @@
         "url": "git+https://github.com/techmefr/dialectr.git",
         "directory": "packages/adapters/pocketbase"
     },
-    "homepage": "https://github.com/techmefr/dialectr#readme",
+    "homepage": "https://techmefr.github.io/dialectr/guides/adapters/",
     "bugs": {
         "url": "https://github.com/techmefr/dialectr/issues"
     },
@@ -18,7 +18,10 @@
         "dialectr",
         "pocketbase",
         "query-builder",
-        "filter"
+        "filter",
+        "typescript",
+        "adapter",
+        "compiler"
     ],
     "sideEffects": false,
     "exports": {

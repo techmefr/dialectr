@@ -1,14 +1,20 @@
 // @ts-check
-import { defineConfig } from 'astro/config';
+import { defineConfig, passthroughImageService } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
 export default defineConfig({
 	site: 'https://techmefr.github.io',
 	base: '/dialectr',
+	image: { service: passthroughImageService() },
 	integrations: [
 		starlight({
 			title: 'dialectr',
-			description: 'One query, every backend dialect. Zero-dependency query builder that compiles to lomkit, Strapi, PocketBase and more.',
+			logo: { light: './src/assets/logo.svg', dark: './src/assets/logo-dark.svg', alt: '' },
+			favicon: '/favicon.svg',
+			customCss: ['./src/styles/custom.css'],
+			expressiveCode: { defaultProps: { frame: 'terminal' } },
+			head: [{ tag: 'meta', attrs: { name: 'keywords', content: 'query builder, TypeScript, fluent API, compiler, Lomkit, PocketBase, Strapi, neXdk' } }],
+			description: 'One query, any dialect. Zero-dependency TypeScript query builder compiling to Lomkit, PocketBase and Strapi.',
 			social: [
 				{ icon: 'github', label: 'GitHub', href: 'https://github.com/techmefr/dialectr' },
 			],

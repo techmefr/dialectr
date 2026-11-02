@@ -1,9 +1,13 @@
 ---
 title: dialectr
-description: One query, every backend dialect. Zero-dependency query builder that compiles to lomkit, Strapi, PocketBase and more.
+description: One query, any dialect. Zero-dependency TypeScript query builder compiling to Lomkit, PocketBase and Strapi.
 template: splash
 hero:
-  tagline: One query, every backend dialect.
+  image:
+    light: ../../assets/logo.svg
+    dark: ../../assets/logo-dark.svg
+    alt: dialectr parrot with three query clauses
+  tagline: One query, any dialect
   actions:
     - text: Read the introduction
       link: introduction/
@@ -22,3 +26,13 @@ import { toPocketbase } from 'dialectr-adapter-pocketbase'
 
 query<{ age: number }>().where('age', '>=', 18).limit(20).to(toPocketbase)
 ```
+
+## Build once, compile by dialect
+
+| Builder | Dialects included |
+|---|---|
+| Typed filters, groups, relations and pagination | Lomkit, PocketBase and Strapi |
+| Neutral, validated query representation | Independent adapter packages |
+| Zero runtime dependencies in the core | Your transport remains your choice |
+
+[Explore the query builder](/dialectr/guides/query-builder/) · [Choose an adapter](/dialectr/guides/adapters/) · [See the ecosystem](/dialectr/guides/ecosystem/)
