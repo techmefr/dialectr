@@ -1,4 +1,4 @@
-import { containsPattern, getExtension, prepareQuery } from 'dialectr'
+import { containsPattern, getExtension, prepareQuery, pruneAlwaysTrue } from 'dialectr'
 import type { Aggregate, FilterNode, Include, Query } from 'dialectr'
 
 export interface LomkitFilter {
@@ -13,6 +13,7 @@ export interface LomkitAggregate {
     relation: string
     type: string
     field?: string
+    alias?: string
     filters?: LomkitFilter[]
 }
 
@@ -62,16 +63,25 @@ function extension(query: Query): Partial<LomkitSearch> {
 
 function scalar(value: unknown): unknown {
     if (value === undefined) return null
-    if (value instanceof Date) return value.toISOString()
+    if (value instanceof Date) return value.toISOString().slice(0, 19).replace('T', ' ')
     return value
 }
 
+function listValue(value: unknown[]): unknown[] {
+    return value.length === 0 ? [null] : value.map(scalar)
+}
+
 function filters(nodes: FilterNode[]): LomkitFilter[] {
+    const pruned = pruneAlwaysTrue(nodes)
+    return pruned === null ? [] : compile(pruned)
+}
+
+function compile(nodes: FilterNode[]): LomkitFilter[] {
     return nodes.map((node, index) => {
         const type = index > 0 && node.boolean === 'or' ? ('or' as const) : undefined
         const base: LomkitFilter =
             node.kind === 'group'
-                ? { nested: filters(node.nodes) }
+                ? { nested: compile(node.nodes) }
                 : {
                       field: node.field,
                       operator: node.operator,
@@ -79,20 +89,39 @@ function filters(nodes: FilterNode[]): LomkitFilter[] {
                           node.operator === 'like' || node.operator === 'not like'
                               ? containsPattern(String(node.value))
                               : Array.isArray(node.value)
-                                ? node.value.map(scalar)
+                                ? listValue(node.value)
                                 : scalar(node.value),
                   }
         return type ? { ...base, type } : base
     })
 }
 
-function aggregate(item: Aggregate): LomkitAggregate {
-    return {
-        relation: item.relation,
-        type: item.type,
-        ...(item.field === undefined ? {} : { field: item.field }),
-        ...(item.filters.length === 0 ? {} : { filters: filters(item.filters) }),
-    }
+function defaultKey(item: Aggregate): string {
+    return [item.relation, item.type, item.field].filter(part => part !== undefined).join('_')
+}
+
+function aggregates(items: Aggregate[]): LomkitAggregate[] {
+    const taken = new Set(items.flatMap(item => (item.alias === undefined ? [] : [item.alias])))
+    return items.map(item => {
+        let alias = item.alias
+        if (alias === undefined) {
+            const base = defaultKey(item)
+            if (taken.has(base)) {
+                let suffix = 2
+                while (taken.has(`${base}_${suffix}`)) suffix++
+                alias = `${base}_${suffix}`
+            }
+            taken.add(alias ?? base)
+        }
+        const compiled = filters(item.filters)
+        return {
+            relation: item.relation,
+            type: item.type,
+            ...(item.field === undefined ? {} : { field: item.field }),
+            ...(alias === undefined ? {} : { alias }),
+            ...(compiled.length === 0 ? {} : { filters: compiled }),
+        }
+    })
 }
 
 function include(item: Include): LomkitInclude {
@@ -101,11 +130,12 @@ function include(item: Include): LomkitInclude {
 
 function search(query: Query): LomkitSearch {
     const result: LomkitSearch = {}
-    if (query.filters.length > 0) result.filters = filters(query.filters)
+    const compiledFilters = filters(query.filters)
+    if (compiledFilters.length > 0) result.filters = compiledFilters
     if (query.sorts.length > 0) result.sorts = query.sorts.map(sort => ({ field: sort.field, direction: sort.direction }))
     if (query.selects.length > 0) result.selects = query.selects.map(field => ({ field }))
     if (query.includes.length > 0) result.includes = query.includes.map(include)
-    if (query.aggregates.length > 0) result.aggregates = query.aggregates.map(aggregate)
+    if (query.aggregates.length > 0) result.aggregates = aggregates(query.aggregates)
     if (query.search !== undefined) result.text = { value: query.search }
     if (query.limit !== undefined) result.limit = query.limit
     if (query.page !== undefined) result.page = query.page

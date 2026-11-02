@@ -27,7 +27,9 @@ query()
 //   filters: [{ field: 'published', operator: '=', value: true }] }] } }
 ```
 
-`orWhere` becomes `type: 'or'`, groups become `nested`. `undefined` becomes `null`, `Date` becomes an ISO string.
+`orWhere` becomes `type: 'or'`, groups become `nested`. `undefined` becomes `null`, `Date` becomes `YYYY-MM-DD HH:mm:ss` in UTC (Laravel's native format, which SQLite compares as text).
+
+`in []` is sent as `value: [null]` and `not in []` is removed (inside an `or` it makes the whole group true). Aggregates sharing type, relation and field get a unique `alias`; pass `alias` to name one. See the [Lomkit backend constraints](https://github.com/techmefr/dialectr/blob/main/packages/adapters/lomkit/README.md#backend-constraints).
 
 ## PocketBase
 
@@ -55,3 +57,5 @@ query()
 ```
 
 Field names are dot-separated segments matching `[A-Za-z_][A-Za-z0-9_]*`. A segment cannot start with `$`, and `include('*')` throws `Strapi wildcard include is not supported`.
+
+`= null` becomes `$null: true` and `!= null` becomes `$notNull: true`. `in []` becomes a condition that matches nothing and `not in []` is removed. Strapi silently caps `pageSize` at 100, so `limit` above 100 throws; pass `toStrapi(query, { maxPageSize })` if your server raised the cap.

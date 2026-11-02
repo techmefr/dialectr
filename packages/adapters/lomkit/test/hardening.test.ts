@@ -22,13 +22,11 @@ const condition = (field: string, value: unknown = 1, operator = '='): FilterNod
 })
 
 describe('toLomkit hardening', () => {
-    it('passes empty in and not in lists through', () => {
+    it('sends in [] as a list holding null and drops not in []', () => {
         expect(toLomkit(query().where('id', 'in', []).build()).search.filters).toEqual([
-            { field: 'id', operator: 'in', value: [] },
+            { field: 'id', operator: 'in', value: [null] },
         ])
-        expect(toLomkit(query().where('id', 'not in', []).build()).search.filters).toEqual([
-            { field: 'id', operator: 'not in', value: [] },
-        ])
+        expect(toLomkit(query().where('id', 'not in', []).build()).search.filters).toBeUndefined()
     })
 
     it('emits null for null and undefined values and keeps falsy values', () => {
@@ -46,11 +44,11 @@ describe('toLomkit hardening', () => {
         ])
     })
 
-    it('serialises dates to ISO strings, lists included', () => {
+    it('serialises dates to Y-m-d H:i:s strings, lists included', () => {
         const date = new Date('2026-01-02T03:04:05.000Z')
         expect(toLomkit(query().where('d', '>', date).where('e', 'in', [date, undefined, 1]).build()).search.filters).toStrictEqual([
-            { field: 'd', operator: '>', value: '2026-01-02T03:04:05.000Z' },
-            { field: 'e', operator: 'in', value: ['2026-01-02T03:04:05.000Z', null, 1] },
+            { field: 'd', operator: '>', value: '2026-01-02 03:04:05' },
+            { field: 'e', operator: 'in', value: ['2026-01-02 03:04:05', null, 1] },
         ])
     })
 
