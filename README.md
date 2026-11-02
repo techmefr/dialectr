@@ -70,11 +70,21 @@ Node.js 22 or later.
 | `aggregate(type, relation, { field?, where? })` | `count`, `min`, `max`, `avg`, `sum`, `exists` |
 | `search(text)` | Free-text search, non-empty, at most 1024 characters |
 | `extend(target, value)` | Backend-specific options, see below |
-| `limit(n)` / `page(n)` | Positive integers |
+| `limit(n)` / `page(n)` | Positive integers. `page(n)` without `limit(n)` makes `build()` and `to()` throw `page() requires limit()` |
 | `build()` | Returns a validated, serializable `Query` |
 | `to(compiler)` | `compiler(build())` |
 
 Operators: `=` `!=` `>` `>=` `<` `<=` `like` `not like` `in` `not in`.
+
+The value is typed from the field when `T` is given: `query<User>().where('age', '>=', 'abc')` and `where('name', 'like', 5)` do not compile.
+
+| Operator | Value |
+|---|---|
+| `=` `!=` `>` `>=` `<` `<=` | The type of the field |
+| `in` `not in` | An array of the type of the field |
+| `like` `not like` | A string |
+
+Without a type (`query()`) every value stays permissive. Fields outside the keys of `T`, such as nested `a.b`, are not accepted when `T` is given.
 
 ```ts
 query<{ id: number }>().where('id', 'in', [1, 2, 3]).to(toPocketbase)
@@ -208,7 +218,7 @@ Limits are exported from the core:
 
 Adapter name rules:
 
-- Strapi: dot-separated segments matching `[A-Za-z_][A-Za-z0-9_]*`, so a field cannot start with `$` and smuggle in an operator. `include('*')` is refused.
+- Strapi: dot-separated segments matching `[A-Za-z_][A-Za-z0-9_]*`, so a field cannot start with `$` and smuggle in an operator. `include('*')` throws `Strapi wildcard include is not supported`.
 - PocketBase: names match `[A-Za-z_][A-Za-z0-9_.:]*`. String values are escaped.
 
 ## Write your own adapter

@@ -11,8 +11,9 @@ query().where('age', '>=', 18).sort('name').limit(20).to(toStrapi)
 ```
 
 - `like` maps to `$startsWithi`, `$endsWithi` or `$containsi`. Inner wildcards (`a%b`, `a_b`) throw.
+- `page` requires `limit`: a query with a page and no limit throws.
 - `include` becomes `populate`: an array for plain relations, an object when a relation has its own sub-query.
-- Field names are dot-separated segments matching `[A-Za-z_][A-Za-z0-9_]*`. A segment cannot start with `$`, and `include('*')` is refused.
+- Field names are dot-separated segments matching `[A-Za-z_][A-Za-z0-9_]*`. A segment cannot start with `$`, and `include('*')` throws `Strapi wildcard include is not supported`.
 - `aggregate`, `search` and `extend('strapi', ...)` throw, Strapi has no equivalent. Extensions for other targets are ignored.
 
 `dialectr` is a peer dependency. Node.js 22 or later. See the [repository README](../../../README.md).

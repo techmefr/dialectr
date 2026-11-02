@@ -6,7 +6,7 @@ description: What each adapter produces and what it refuses.
 | Feature | Lomkit | PocketBase | Strapi |
 |---|---|---|---|
 | Filters, groups, `in`, `like` | yes | yes | yes, no inner wildcards |
-| `sort`, `select`, `limit`, `page` | yes | yes | yes |
+| `sort`, `select`, `limit`, `page` (needs `limit`) | yes | yes | yes |
 | `include` | nested search | `expand`, no sub-query | `populate`, with sub-query |
 | `aggregate` | yes | throws | throws |
 | `search` | `search.text` | throws | throws |
@@ -52,4 +52,4 @@ query()
 //   sort: ['title:desc'], pagination: { pageSize: 5 } } } }
 ```
 
-Field names are dot-separated segments matching `[A-Za-z_][A-Za-z0-9_]*`. A segment cannot start with `$`, and `include('*')` is refused.
+Field names are dot-separated segments matching `[A-Za-z_][A-Za-z0-9_]*`. A segment cannot start with `$`, and `include('*')` throws `Strapi wildcard include is not supported`.

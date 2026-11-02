@@ -13,6 +13,7 @@ query().where('age', '>=', 18).sort('name', 'desc').limit(20).to(toPocketbase)
 - `like` without a wildcard means contains, case-insensitive.
 - `in` / `not in` become `||` / `&&` chains.
 - String values are escaped, field names must match `[A-Za-z_][A-Za-z0-9_.:]*`.
+- `page` requires `limit`: a query with a page and no limit throws.
 - `include('posts')` becomes `expand`. An include with filters, sorts, selects, nested includes or pagination throws.
 - `aggregate`, `search` and `extend('pocketbase', ...)` throw, PocketBase has no equivalent. Extensions for other targets are ignored.
 

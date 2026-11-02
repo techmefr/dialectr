@@ -16,11 +16,21 @@ description: Every builder method, operators and precedence.
 | `aggregate(type, relation, { field?, where? })` | `count`, `min`, `max`, `avg`, `sum`, `exists` |
 | `search(text)` | Free-text search |
 | `extend(target, value)` | Backend-specific options |
-| `limit(n)` / `page(n)` | Positive integers |
+| `limit(n)` / `page(n)` | Positive integers. `page(n)` without `limit(n)` makes `build()` and `to()` throw `page() requires limit()` |
 | `build()` | Validated, serializable `Query` |
 | `to(compiler)` | `compiler(build())` |
 
 Operators: `=` `!=` `>` `>=` `<` `<=` `like` `not like` `in` `not in`.
+
+The value is typed from the field when `T` is given: `query<User>().where('age', '>=', 'abc')` and `where('name', 'like', 5)` do not compile.
+
+| Operator | Value |
+|---|---|
+| `=` `!=` `>` `>=` `<` `<=` | The type of the field |
+| `in` `not in` | An array of the type of the field |
+| `like` `not like` | A string |
+
+Without a type (`query()`) every value stays permissive. Fields outside the keys of `T`, such as nested `a.b`, are not accepted when `T` is given.
 
 ## AND before OR
 

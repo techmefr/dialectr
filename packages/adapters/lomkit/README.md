@@ -12,6 +12,7 @@ query().where('age', '>=', 18).sort('name').to(toLomkit)
 ```
 
 - Supports includes (each include is a nested search) and aggregates.
+- `page` requires `limit`: a query with a page and no limit throws.
 - `orWhere` becomes `type: 'or'`, groups become `nested`.
 - `search(text)` is emitted as `search.text = { value }`.
 - `extend('lomkit', { scopes, instructions, gates })` is merged into the search. Each value must be an array, any other key throws, extensions for other targets are ignored.

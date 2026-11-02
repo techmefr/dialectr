@@ -23,7 +23,7 @@ toPocketbase(built)
 
 ## API
 
-Builder: `where`, `orWhere`, `whereGroup`, `orWhereGroup`, `sort`, `select`, `include`, `aggregate`, `search`, `extend`, `limit`, `page`, `build`, `to(compiler)`.
+Builder: `where`, `orWhere`, `whereGroup`, `orWhereGroup`, `sort`, `select`, `include`, `aggregate`, `search`, `extend`, `limit`, `page`, `build`, `to(compiler)`. Filter values are typed from the field, and `page` requires `limit`.
 
 Helpers for adapter authors:
 
