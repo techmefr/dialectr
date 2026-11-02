@@ -143,6 +143,19 @@ toPocketbase(q)
 // { filter: "active=true && ((role='admin') || (role='editor'))" }
 ```
 
+Builders are immutable: `group.where(...)` returns a new builder and leaves `group` untouched. The callback of `whereGroup`, `orWhereGroup`, `include` and the `where` option of `aggregate` must return the chained result. Returning the builder it received, or nothing, throws an error that says so, instead of silently dropping the group:
+
+```ts
+query().whereGroup(group => {
+  group.where('a', '=', 1)
+  return group
+})
+
+query().whereGroup(group => group.where('a', '=', 1).where('b', '=', 2))
+```
+
+The first call throws, the second is correct. To add conditions in a loop, reassign: `group = group.where(...)`.
+
 ### Include and aggregate
 
 ```ts

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { groupByOr, prepareQuery, query } from '../src/index.ts'
+import { QueryBuilder, groupByOr, prepareQuery, query } from '../src/index.ts'
 
 interface User {
     id: number
@@ -41,10 +41,49 @@ describe('query builder', () => {
         const built = query<User>()
             .where('age', '>', 1)
             .orWhereGroup(group => group.where('name', 'Ann').where('age', '<', 5))
-            .whereGroup(group => group)
+            .whereGroup(() => query<User>())
             .build()
         expect(built.filters).toHaveLength(2)
         expect(built.filters[1]).toMatchObject({ kind: 'group', boolean: 'or' })
+    })
+
+    describe('callbacks that do not chain the builder', () => {
+        const message = /chain the builder and return the result.*builders are immutable/
+
+        it('throws when a group callback returns the builder it received', () => {
+            expect(() =>
+                query<User>().whereGroup(group => {
+                    group.where('name', 'Ann')
+                    return group
+                }),
+            ).toThrow(message)
+            expect(() => query<User>().whereGroup(group => group)).toThrow(/whereGroup callback/)
+            expect(() => query<User>().orWhereGroup(group => group)).toThrow(/orWhereGroup callback/)
+        })
+
+        it('throws when a callback returns undefined', () => {
+            const forgotReturn = (() => undefined) as unknown as (builder: QueryBuilder<User>) => QueryBuilder<User>
+            expect(() => query<User>().whereGroup(forgotReturn)).toThrow(message)
+            expect(() => query<User>().orWhereGroup(forgotReturn)).toThrow(message)
+            expect(() => query<User>().include('posts', (() => undefined) as never)).toThrow(message)
+            expect(() => query<User>().aggregate('count', 'posts', { where: (() => undefined) as never })).toThrow(message)
+        })
+
+        it('throws for include and aggregate where callbacks that return the received builder', () => {
+            expect(() => query<User>().include('posts', builder => builder)).toThrow(/include callback/)
+            expect(() => query<User>().aggregate('count', 'posts', { where: builder => builder })).toThrow(
+                /aggregate where callback/,
+            )
+        })
+
+        it('accepts chained callbacks and nested groups that end up empty', () => {
+            const built = query<User>()
+                .whereGroup(group => group.where('name', 'Ann').where('age', '<', 5))
+                .whereGroup(group => group.whereGroup(() => query<User>()).where('id', 1))
+                .build()
+            expect(built.filters).toHaveLength(2)
+            expect(() => query<User>().whereGroup(group => group.whereGroup(() => query<User>()))).not.toThrow()
+        })
     })
 
     it('records selects, includes, aggregates, limit and page', () => {

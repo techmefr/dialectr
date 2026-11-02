@@ -39,6 +39,20 @@ const emptyQuery = (): Query => ({
 
 const trusted = new WeakSet<Query>()
 
+function runCallback<B extends object>(
+    method: string,
+    callback: (builder: B) => B,
+    received: B,
+): B {
+    const result = callback(received)
+    if (result === undefined || result === received) {
+        throw new Error(
+            `${method} callback must chain the builder and return the result: builders are immutable, so write builder => builder.where(...).where(...) instead of calling builder.where(...) and returning the original builder`,
+        )
+    }
+    return result
+}
+
 export class QueryBuilder<T extends object = Record<string, unknown>> {
     readonly #query: Query
 
@@ -86,7 +100,7 @@ export class QueryBuilder<T extends object = Record<string, unknown>> {
         callback?: (builder: QueryBuilder) => QueryBuilder,
     ): QueryBuilder<T> {
         assertField(relation)
-        const query = callback ? callback(new QueryBuilder()).build() : emptyQuery()
+        const query = callback ? runCallback('include', callback, new QueryBuilder()).build() : emptyQuery()
         const include: Include = { relation, query }
         return this.#next({ includes: [...this.#query.includes, include] })
     }
@@ -99,7 +113,7 @@ export class QueryBuilder<T extends object = Record<string, unknown>> {
         assertField(relation)
         if (options.field !== undefined) assertField(options.field)
         if (options.alias !== undefined) assertField(options.alias)
-        const filters = options.where ? options.where(new QueryBuilder()).build().filters : []
+        const filters = options.where ? runCallback('aggregate where', options.where, new QueryBuilder()).build().filters : []
         const aggregate: Aggregate = {
             type,
             relation,
@@ -170,8 +184,8 @@ export class QueryBuilder<T extends object = Record<string, unknown>> {
     }
 
     #group(boolean: Connector, callback: (builder: QueryBuilder<T>) => QueryBuilder<T>): QueryBuilder<T> {
-        const nodes = callback(new QueryBuilder<T>()).build().filters
-        if (nodes.length === 0) return this
+        const nodes = runCallback(boolean === 'and' ? 'whereGroup' : 'orWhereGroup', callback, new QueryBuilder<T>()).build().filters
+        if (nodes.length === 0) return this.#next({})
         const node: FilterNode = { kind: 'group', boolean, nodes }
         return this.#next({ filters: [...this.#query.filters, node] })
     }
