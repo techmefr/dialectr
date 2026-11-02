@@ -65,8 +65,8 @@ describe('toPocketbase hardening', () => {
     })
 
     it('maps empty in and not in lists', () => {
-        expect(toPocketbase(query().where('id', 'not in', []).build()).filter).toBe('true')
-        expect(toPocketbase(query().where('id', 'in', []).build()).filter).toBe('false')
+        expect(toPocketbase(query().where('id', 'not in', []).build()).filter).toBe('1=1')
+        expect(toPocketbase(query().where('id', 'in', []).build()).filter).toBe('1=0')
     })
 
     it('maps null, undefined and Date values', () => {
@@ -116,7 +116,7 @@ describe('toPocketbase hardening', () => {
     it('resolves the published entry through the exports map', async () => {
         const manifest = packageJson
         expect(manifest.engines.node).toBe('>=22')
-        expect(manifest.peerDependencies.dialectr).toBe('workspace:^')
+        expect(manifest.peerDependencies.dialectr).toBe('>=0.0.1 <1')
         const entry = new URL(`../${manifest.exports['.'].import}`, import.meta.url).href
         const built = await import(entry)
         expect(built.toPocketbase(query().where('a', 1).build()).filter).toBe('a=1')

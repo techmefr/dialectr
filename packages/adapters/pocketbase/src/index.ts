@@ -46,7 +46,7 @@ function condition(node: Condition): string {
     const name = field(node.field)
     if (node.operator === 'in' || node.operator === 'not in') {
         const values = node.value as unknown[]
-        if (values.length === 0) return node.operator === 'in' ? 'false' : 'true'
+        if (values.length === 0) return node.operator === 'in' ? '1=0' : '1=1'
         const joiner = node.operator === 'in' ? ' || ' : ' && '
         const operator = node.operator === 'in' ? '=' : '!='
         return `(${values.map(value => `${name}${operator}${literal(value)}`).join(joiner)})`

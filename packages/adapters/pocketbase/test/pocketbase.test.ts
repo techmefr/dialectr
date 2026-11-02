@@ -31,7 +31,7 @@ describe('toPocketbase', () => {
     it('expands in and not in', () => {
         expect(toPocketbase(query().where('id', 'in', ['a', 'b']).build()).filter).toBe("(id='a' || id='b')")
         expect(toPocketbase(query().where('id', 'not in', [1, 2]).build()).filter).toBe('(id!=1 && id!=2)')
-        expect(toPocketbase(query().where('id', 'in', []).build()).filter).toBe('false')
+        expect(toPocketbase(query().where('id', 'in', []).build()).filter).toBe('1=0')
     })
 
     it('escapes quotes and backslashes in string values', () => {
