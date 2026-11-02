@@ -27,6 +27,10 @@ export type Field<T> = Extract<keyof T, string>
 
 export type FieldValue<T, K extends Field<T>> = Exclude<T[K], undefined>
 
+export interface ExtensionMap {}
+
+export type Present<V> = Exclude<V, null | undefined | false | 0 | ''>
+
 export type ComparisonOperator = '=' | '!=' | '>' | '>=' | '<' | '<='
 
 const emptyQuery = (): Query => ({
@@ -36,6 +40,10 @@ const emptyQuery = (): Query => ({
     includes: [],
     aggregates: [],
 })
+
+function isBlank(value: unknown): boolean {
+    return value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)
+}
 
 const trusted = new WeakSet<Query>()
 
@@ -74,6 +82,39 @@ export class QueryBuilder<T extends object = Record<string, unknown>> {
     orWhere(field: Field<T>, operator: 'like' | 'not like', value: string): QueryBuilder<T>
     orWhere(field: Field<T>, operatorOrValue: unknown, maybeValue?: unknown): QueryBuilder<T> {
         return this.#condition('or', field, operatorOrValue, maybeValue, arguments.length)
+    }
+
+    whereIf<K extends Field<T>>(field: K, value: FieldValue<T, K> | null | undefined): QueryBuilder<T>
+    whereIf<K extends Field<T>>(field: K, operator: ComparisonOperator, value: FieldValue<T, K> | null | undefined): QueryBuilder<T>
+    whereIf<K extends Field<T>>(
+        field: K,
+        operator: 'in' | 'not in',
+        value: Array<FieldValue<T, K>> | null | undefined,
+    ): QueryBuilder<T>
+    whereIf(field: Field<T>, operator: 'like' | 'not like', value: string | null | undefined): QueryBuilder<T>
+    whereIf(field: Field<T>, operatorOrValue: unknown, maybeValue?: unknown): QueryBuilder<T> {
+        const value = arguments.length >= 3 ? maybeValue : operatorOrValue
+        if (isBlank(value)) return this
+        return this.#condition('and', field, operatorOrValue, maybeValue, arguments.length)
+    }
+
+    orWhereIf<K extends Field<T>>(field: K, value: FieldValue<T, K> | null | undefined): QueryBuilder<T>
+    orWhereIf<K extends Field<T>>(field: K, operator: ComparisonOperator, value: FieldValue<T, K> | null | undefined): QueryBuilder<T>
+    orWhereIf<K extends Field<T>>(
+        field: K,
+        operator: 'in' | 'not in',
+        value: Array<FieldValue<T, K>> | null | undefined,
+    ): QueryBuilder<T>
+    orWhereIf(field: Field<T>, operator: 'like' | 'not like', value: string | null | undefined): QueryBuilder<T>
+    orWhereIf(field: Field<T>, operatorOrValue: unknown, maybeValue?: unknown): QueryBuilder<T> {
+        const value = arguments.length >= 3 ? maybeValue : operatorOrValue
+        if (isBlank(value)) return this
+        return this.#condition('or', field, operatorOrValue, maybeValue, arguments.length)
+    }
+
+    when<V>(condition: V, callback: (builder: QueryBuilder<T>, value: Present<V>) => QueryBuilder<T>): QueryBuilder<T> {
+        if (!condition) return this
+        return runCallback<QueryBuilder<T>>('when', builder => callback(builder, condition as Present<V>), this)
     }
 
     whereGroup(callback: (builder: QueryBuilder<T>) => QueryBuilder<T>): QueryBuilder<T> {
@@ -129,7 +170,7 @@ export class QueryBuilder<T extends object = Record<string, unknown>> {
         return this.#next({ search: text })
     }
 
-    extend(target: string, value: unknown): QueryBuilder<T> {
+    extend<K extends string>(target: K, value: K extends keyof ExtensionMap ? ExtensionMap[K] : unknown): QueryBuilder<T> {
         assertExtensionKey(target)
         assertExtensionValue(value)
         const extensions = { ...(this.#query.extensions ?? {}), [target]: cloneExtensionValue(value) }

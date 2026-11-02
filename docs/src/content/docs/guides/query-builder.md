@@ -15,6 +15,8 @@ description: Every builder method, operators and precedence.
 | `include(relation, cb?)` | Load a relation, optionally constrained |
 | `aggregate(type, relation, { field?, alias?, where? })` | `count`, `min`, `max`, `avg`, `sum`, `exists` |
 | `search(text)` | Free-text search |
+| `whereIf(field, [operator,] value)` / `orWhereIf(...)` | Like `where`, skipped when the value is `undefined`, `null`, `''` or `[]` |
+| `when(condition, cb)` | Applies `cb(builder, condition)` only when `condition` is truthy |
 | `extend(target, value)` | Backend-specific options |
 | `limit(n)` / `page(n)` | Positive integers. `page(n)` without `limit(n)` makes `build()` and `to()` throw `page() requires limit()` |
 | `build()` | Validated, serializable `Query` |
@@ -71,6 +73,34 @@ query().whereGroup(group => group.where('a', '=', 1).where('b', '=', 2))
 
 The first call throws, the second is correct. To add conditions in a loop, reassign: `group = group.where(...)`.
 
+## Optional filters
+
+Building a query from optional inputs used to need a ternary and `.filter(Boolean)`. Use `whereIf` and `when`.
+
+```ts
+const filters = [
+  status ? { field: 'status', operator: '=', value: status } : null,
+  ids.length > 0 ? { field: 'id', operator: 'in', value: ids } : null,
+].filter(Boolean)
+
+query<Order>()
+  .whereIf('status', status)
+  .whereIf('id', 'in', ids)
+  .when(search, (builder, text) => builder.search(text))
+  .when(onlyMine, builder => builder.extend('lomkit', { scopes: [{ name: 'mine' }] }))
+```
+
+`whereIf` skips `undefined`, `null`, `''` and `[]`; `0` and `false` are real values. `where(field, 'in', [])` is unchanged: it still matches nothing. `when` follows the immutability rule: the callback must return the chained builder, otherwise it throws.
+
+## Nested includes
+
+A dotted path loads a nested relation and the callback applies to the last segment. Lomkit compiles it to nested `includes` and merges paths that share a prefix.
+
+```ts
+query().include('posts.comments', comments => comments.where('approved', true)).to(toLomkit)
+// { search: { includes: [{ relation: 'posts', includes: [{ relation: 'comments', filters: [...] }] }] } }
+```
+
 ## like
 
 `%` at the start and/or end, `\` escapes `%` and `_`. A pattern without a wildcard means contains, case-insensitive.
@@ -104,4 +134,4 @@ query().search('john').extend('lomkit', { scopes: [{ name: 'active' }] }).to(toL
 // { search: { text: { value: 'john' }, scopes: [{ name: 'active' }] } }
 ```
 
-Lomkit accepts `scopes`, `instructions` and `gates` (arrays) and rejects any other key. PocketBase and Strapi throw on an extension aimed at them.
+Lomkit accepts `gates` (`create`, `view`, `update`, `delete`, `restore`, `forceDelete`), `scopes` (`{ name, parameters? }`) and `instructions` (`{ name, fields?: { name, value }[] }`), typed once `dialectr-adapter-lomkit` is imported, and rejects any other key. Fields such as `title.keyword` (Scout) are passed through unchanged in filters and sorts. PocketBase and Strapi throw on an extension aimed at them.

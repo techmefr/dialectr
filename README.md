@@ -91,6 +91,8 @@ Node.js 22 or later.
 |---|---|
 | `where(field, value)` / `where(field, operator, value)` | AND condition, operator defaults to `=` |
 | `orWhere(...)` | OR condition |
+| `whereIf(field, [operator,] value)` / `orWhereIf(...)` | Like `where`, skipped when the value is `undefined`, `null`, `''` or `[]` |
+| `when(condition, cb)` | Runs `cb(builder, condition)` and returns its chained result when `condition` is truthy, otherwise returns the builder unchanged |
 | `whereGroup(cb)` / `orWhereGroup(cb)` | Nested group, empty groups are skipped |
 | `sort(field, direction?)` | `'asc'` (default) or `'desc'` |
 | `select(...fields)` | Fields to return |
@@ -156,6 +158,25 @@ query().whereGroup(group => group.where('a', '=', 1).where('b', '=', 2))
 
 The first call throws, the second is correct. To add conditions in a loop, reassign: `group = group.where(...)`.
 
+### Optional filters
+
+Building a query from optional inputs used to need a ternary and `.filter(Boolean)`. Use `whereIf` and `when`.
+
+```ts
+const filters = [
+  status ? { field: 'status', operator: '=', value: status } : null,
+  ids.length > 0 ? { field: 'id', operator: 'in', value: ids } : null,
+].filter(Boolean)
+
+query<Order>()
+  .whereIf('status', status)
+  .whereIf('id', 'in', ids)
+  .when(search, (builder, text) => builder.search(text))
+  .when(onlyMine, builder => builder.extend('lomkit', { scopes: [{ name: 'mine' }] }))
+```
+
+`whereIf` skips `undefined`, `null`, `''` and `[]`; `0` and `false` are real values. `where(field, 'in', [])` is unchanged: it still matches nothing. `when` follows the immutability rule: the callback must return the chained builder, otherwise it throws.
+
 ### Include and aggregate
 
 ```ts
@@ -172,6 +193,8 @@ toStrapi(q)
 // { fields: ['id', 'name'],
 //   populate: { posts: { filters: { published: { $eq: true } }, sort: ['title:desc'], pagination: { pageSize: 5 } } } }
 ```
+
+A dotted path loads a nested relation: `include('posts.comments', c => c.where('approved', true))` applies the callback to `comments`. Lomkit compiles it to `includes: [{ relation: 'posts', includes: [{ relation: 'comments', ... }] }]` and merges paths sharing a prefix. Strapi and PocketBase keep the dotted name.
 
 PocketBase `expand` cannot be constrained: an `include` with a sub-query throws. A plain `include('posts')` works everywhere.
 
@@ -223,7 +246,7 @@ toLomkit(q)
 // { search: { text: { value: 'john' }, scopes: [{ name: 'active' }] } }
 ```
 
-- Lomkit merges `scopes`, `instructions` and `gates` (arrays). Any other key, such as `filters`, throws.
+- Lomkit merges `gates` (`create`, `view`, `update`, `delete`, `restore`, `forceDelete`), `scopes` (`{ name, parameters? }`) and `instructions` (`{ name, fields?: { name, value }[] }`), all typed. Any other key, such as `filters`, throws. Field names such as `title.keyword` (Scout) are passed through unchanged in filters and sorts.
 - PocketBase and Strapi accept no extension for their own target: it throws.
 - `getExtension(query, target)` reads an extension, returning `undefined` when absent.
 

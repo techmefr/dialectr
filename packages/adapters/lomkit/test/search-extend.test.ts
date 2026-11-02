@@ -41,15 +41,15 @@ describe('toLomkit search and extend', () => {
     })
 
     it('rejects unknown extension keys and keys that would override the core', () => {
-        expect(() => toLomkit(query().extend('lomkit', { filters: [] }).build())).toThrow(/Unsupported lomkit extension key/)
-        expect(() => toLomkit(query().extend('lomkit', { limit: 1 }).build())).toThrow(/Unsupported lomkit extension key: "limit"/)
-        expect(() => toLomkit(query().extend('lomkit', { nope: [] }).build())).toThrow(/Unsupported lomkit extension key: "nope"/)
+        expect(() => toLomkit(query().extend('lomkit', { filters: [] } as never).build())).toThrow(/Unsupported lomkit extension key/)
+        expect(() => toLomkit(query().extend('lomkit', { limit: 1 } as never).build())).toThrow(/Unsupported lomkit extension key: "limit"/)
+        expect(() => toLomkit(query().extend('lomkit', { nope: [] } as never).build())).toThrow(/Unsupported lomkit extension key: "nope"/)
     })
 
     it('rejects non-object and non-array extension values', () => {
-        expect(() => toLomkit(query().extend('lomkit', 1).build())).toThrow(/lomkit extension must be an object/)
-        expect(() => toLomkit(query().extend('lomkit', [1]).build())).toThrow(/lomkit extension must be an object/)
-        expect(() => toLomkit(query().extend('lomkit', { scopes: 'x' }).build())).toThrow(/"scopes" must be an array/)
+        expect(() => toLomkit(query().extend('lomkit', 1 as never).build())).toThrow(/lomkit extension must be an object/)
+        expect(() => toLomkit(query().extend('lomkit', [1] as never).build())).toThrow(/lomkit extension must be an object/)
+        expect(() => toLomkit(query().extend('lomkit', { scopes: 'x' } as never).build())).toThrow(/"scopes" must be an array/)
     })
 
     it('merges lomkit extensions inside an include', () => {
@@ -62,7 +62,7 @@ describe('toLomkit search and extend', () => {
     })
 
     it('rejects an invalid lomkit extension inside an include', () => {
-        expect(() => toLomkit(query().include('posts', inner => inner.extend('lomkit', { nope: [] })).build())).toThrow(
+        expect(() => toLomkit(query().include('posts', inner => inner.extend('lomkit', { nope: [] } as never)).build())).toThrow(
             /Unsupported lomkit extension key: "nope"/,
         )
     })
@@ -76,7 +76,7 @@ describe('toLomkit search and extend', () => {
     it('does not alias extension arrays of the builder', () => {
         const builder = query().extend('lomkit', { scopes: [{ name: 'a' }] })
         const payload = toLomkit(builder.build())
-        payload.search.scopes?.push('x')
+        payload.search.scopes?.push('x' as never)
         expect(toLomkit(builder.build()).search.scopes).toEqual([{ name: 'a' }])
     })
 

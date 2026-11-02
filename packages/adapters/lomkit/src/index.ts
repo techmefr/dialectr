@@ -1,6 +1,35 @@
 import { containsPattern, getExtension, prepareQuery, pruneAlwaysTrue } from 'dialectr'
 import type { Aggregate, FilterNode, Include, Query } from 'dialectr'
 
+export type LomkitGate = 'create' | 'view' | 'update' | 'delete' | 'restore' | 'forceDelete'
+
+export interface LomkitScope {
+    name: string
+    parameters?: unknown[]
+}
+
+export interface LomkitInstructionField {
+    name: string
+    value: unknown
+}
+
+export interface LomkitInstruction {
+    name: string
+    fields?: LomkitInstructionField[]
+}
+
+export interface LomkitExtension {
+    gates?: LomkitGate[]
+    scopes?: LomkitScope[]
+    instructions?: LomkitInstruction[]
+}
+
+declare module 'dialectr' {
+    interface ExtensionMap {
+        lomkit: LomkitExtension
+    }
+}
+
 export interface LomkitFilter {
     field?: string
     operator?: string
@@ -24,9 +53,9 @@ export interface LomkitSearch {
     includes?: LomkitInclude[]
     aggregates?: LomkitAggregate[]
     text?: { value: string }
-    scopes?: unknown[]
-    instructions?: unknown[]
-    gates?: unknown[]
+    scopes?: LomkitScope[]
+    instructions?: LomkitInstruction[]
+    gates?: LomkitGate[]
     limit?: number
     page?: number
 }
@@ -124,8 +153,29 @@ function aggregates(items: Aggregate[]): LomkitAggregate[] {
     })
 }
 
-function include(item: Include): LomkitInclude {
-    return { relation: item.relation, ...search(item.query) }
+function includes(items: Include[]): LomkitInclude[] {
+    const roots: LomkitInclude[] = []
+    for (const item of items) {
+        const segments = item.relation.split('.')
+        let level = roots
+        segments.forEach((segment, index) => {
+            let node = level.find(candidate => candidate.relation === segment)
+            if (node === undefined) {
+                node = { relation: segment }
+                level.push(node)
+            }
+            if (index === segments.length - 1) {
+                const compiled = search(item.query)
+                const nested = [...(node.includes ?? []), ...(compiled.includes ?? [])]
+                Object.assign(node, compiled)
+                if (nested.length > 0) node.includes = nested
+            } else {
+                node.includes ??= []
+                level = node.includes
+            }
+        })
+    }
+    return roots
 }
 
 function search(query: Query): LomkitSearch {
@@ -134,7 +184,7 @@ function search(query: Query): LomkitSearch {
     if (compiledFilters.length > 0) result.filters = compiledFilters
     if (query.sorts.length > 0) result.sorts = query.sorts.map(sort => ({ field: sort.field, direction: sort.direction }))
     if (query.selects.length > 0) result.selects = query.selects.map(field => ({ field }))
-    if (query.includes.length > 0) result.includes = query.includes.map(include)
+    if (query.includes.length > 0) result.includes = includes(query.includes)
     if (query.aggregates.length > 0) result.aggregates = aggregates(query.aggregates)
     if (query.search !== undefined) result.text = { value: query.search }
     if (query.limit !== undefined) result.limit = query.limit

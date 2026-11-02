@@ -8,6 +8,9 @@
 - `Date` becomes `YYYY-MM-DD HH:mm:ss` in UTC. Do not emit ISO strings: SQLite compares them as text.
 - Aggregates keep Lomkit's default key `relation_type[_field]` for the first occurrence and get `alias` `..._2`, `..._3` for later ones with the same type, relation and field. An explicit `alias` is passed through and never reused by a generated one.
 - `like` without wildcard is sent as `%value%`.
+- A dotted include (`posts.comments`) is split into nested `includes`; paths sharing a prefix are merged into one include and the callback query lands on the last segment. Core keeps the dotted `relation` untouched.
+- `*.keyword` fields (Scout) are plain field names, passed through for filters and sorts.
+- `LomkitExtension` types `gates` (`LomkitGate`), `scopes` (`{ name, parameters? }`) and `instructions` (`{ name, fields?: { name, value }[] }`, the shape Lomkit reads). It augments core's `ExtensionMap`.
 
 ## Backend constraints to remember
 

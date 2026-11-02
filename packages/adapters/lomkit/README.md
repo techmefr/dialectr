@@ -15,7 +15,9 @@ query().where('age', '>=', 18).sort('name').to(toLomkit)
 - `page` requires `limit`: a query with a page and no limit throws.
 - `orWhere` becomes `type: 'or'`, groups become `nested`.
 - `search(text)` is emitted as `search.text = { value }`.
-- `extend('lomkit', { scopes, instructions, gates })` is merged into the search. Each value must be an array, any other key throws, extensions for other targets are ignored.
+- `extend('lomkit', { scopes, instructions, gates })` is merged into the search and typed: `gates` are `create`, `view`, `update`, `delete`, `restore` or `forceDelete`, `scopes` are `{ name, parameters? }[]`, `instructions` are `{ name, fields?: { name, value }[] }[]`. Each value must be an array, any other key throws, extensions for other targets are ignored.
+- `include('posts.comments', cb)` becomes nested includes (`posts` containing `comments`, the callback applies to `comments`). Paths sharing a prefix are merged.
+- Field names such as `title.keyword` (Scout) are passed through unchanged in filters and sorts.
 - `like` without a wildcard is sent as `%value%` (contains).
 - `undefined` becomes `null`. `Date` becomes `YYYY-MM-DD HH:mm:ss` in UTC, without milliseconds: Laravel's native format, accepted by MySQL, PostgreSQL and SQLite. An ISO string is compared as text on SQLite and breaks equality and boundary comparisons, so pass a `Date` rather than an ISO string.
 - `in []` is sent as `value: [null]` (Lomkit answers 422 on an empty list; `[null]` is accepted and matches nothing). `not in []` is removed from the filters; inside an `or` it makes the whole group true.
