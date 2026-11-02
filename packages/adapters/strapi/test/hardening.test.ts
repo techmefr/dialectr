@@ -37,7 +37,8 @@ describe('toStrapi hardening', () => {
             'Sort direction',
         )
         expect(() => toStrapi(query().select('$x').build())).toThrow('Unsupported field name')
-        expect(() => toStrapi(query().include('*').build())).toThrow('Unsupported field name')
+        expect(() => toStrapi(query().include('*').build())).toThrow('wildcard include is not supported')
+        expect(() => toStrapi(query().include('a.*').build())).toThrow('wildcard include is not supported')
         expect(() => toStrapi(query().include('a.$x').build())).toThrow('Unsupported field name')
         expect(() => toStrapi(query().include('posts', inner => inner.where('$or', 1)).build())).toThrow(
             'Unsupported field name',
@@ -147,5 +148,16 @@ describe('toStrapi hardening', () => {
         const entry = new URL(`../${manifest.exports['.'].import}`, import.meta.url).href
         const built = await import(entry)
         expect(built.toStrapi(query().where('a', 1).build()).filters).toEqual({ a: { $eq: 1 } })
+    })
+})
+
+describe('page without limit', () => {
+    it('is refused', () => {
+        expect(() => toStrapi(raw({ page: 2 }))).toThrow('page() requires limit()')
+        expect(() => toStrapi(query().page(2).build())).toThrow('page() requires limit()')
+    })
+
+    it('is accepted with a limit', () => {
+        expect(() => toStrapi(query().limit(5).page(2).build())).not.toThrow()
     })
 })

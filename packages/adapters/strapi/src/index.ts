@@ -34,6 +34,11 @@ function path(name: string): string[] {
     return segments
 }
 
+function relationPath(name: string): string {
+    if (name.split('.').includes('*')) throw new Error('Strapi wildcard include is not supported')
+    return path(name).join('.')
+}
+
 function like(value: unknown): { operator: string; value: string } {
     const { literal, leading, trailing, inner } = parseLike(String(value))
     if (inner) throw new Error(`Strapi only supports a leading or trailing "%" in like patterns: "${String(value)}"`)
@@ -100,7 +105,7 @@ function params(query: Query): StrapiParams {
     }
     if (query.selects.length > 0) result.fields = query.selects.map(name => path(name).join('.'))
     if (query.includes.length > 0) {
-        const relations = query.includes.map(include => path(include.relation).join('.'))
+        const relations = query.includes.map(include => relationPath(include.relation))
         result.populate = query.includes.every(include => isPlain(include.query))
             ? relations
             : Object.fromEntries(query.includes.map((include, index) => [relations[index], params(include.query)]))
