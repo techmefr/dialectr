@@ -5,6 +5,21 @@
     "type": "module",
     "license": "MIT",
     "author": "techmefr",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/techmefr/dialectr.git",
+        "directory": "packages/adapters/pocketbase"
+    },
+    "homepage": "https://github.com/techmefr/dialectr#readme",
+    "bugs": {
+        "url": "https://github.com/techmefr/dialectr/issues"
+    },
+    "keywords": [
+        "dialectr",
+        "pocketbase",
+        "query-builder",
+        "filter"
+    ],
     "sideEffects": false,
     "exports": {
         ".": {
@@ -15,15 +30,23 @@
     },
     "main": "./dist/index.mjs",
     "types": "./dist/index.d.ts",
-    "files": ["dist"],
-    "engines": { "node": ">=22" },
-    "publishConfig": { "access": "public" },
+    "files": [
+        "dist"
+    ],
+    "engines": {
+        "node": ">=22"
+    },
+    "publishConfig": {
+        "access": "public"
+    },
     "scripts": {
         "build": "unbuild",
         "test": "vitest run",
         "dev": "unbuild --stub"
     },
-    "peerDependencies": { "dialectr": "workspace:^" },
+    "peerDependencies": {
+        "dialectr": ">=0.0.1 <1"
+    },
     "devDependencies": {
         "dialectr": "workspace:*",
         "typescript": "^5.9.3",

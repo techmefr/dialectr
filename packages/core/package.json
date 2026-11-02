@@ -5,6 +5,23 @@
     "type": "module",
     "license": "MIT",
     "author": "techmefr",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/techmefr/dialectr.git",
+        "directory": "packages/core"
+    },
+    "homepage": "https://github.com/techmefr/dialectr#readme",
+    "bugs": {
+        "url": "https://github.com/techmefr/dialectr/issues"
+    },
+    "keywords": [
+        "dialectr",
+        "query-builder",
+        "query",
+        "filter",
+        "backend",
+        "adapter"
+    ],
     "sideEffects": false,
     "exports": {
         ".": {
@@ -15,9 +32,15 @@
     },
     "main": "./dist/index.mjs",
     "types": "./dist/index.d.ts",
-    "files": ["dist"],
-    "engines": { "node": ">=22" },
-    "publishConfig": { "access": "public" },
+    "files": [
+        "dist"
+    ],
+    "engines": {
+        "node": ">=22"
+    },
+    "publishConfig": {
+        "access": "public"
+    },
     "scripts": {
         "build": "unbuild",
         "test": "vitest run",
