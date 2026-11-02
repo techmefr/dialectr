@@ -13,100 +13,216 @@ const users = query<{ name: string; age: number }>()
   .orWhere('name', 'like', 'A%')
   .sort('name')
   .limit(20)
+  .page(2)
   .build()
 
-toLomkit(users)     // { search: { filters: [...], sorts: [...], limit: 20 } }
-toPocketbase(users) // { filter: "(age>=18) || (name~'A%')", sort: 'name', perPage: 20 }
-toStrapi(users)     // { filters: { $or: [...] }, sort: ['name:asc'], pagination: {...} }
+toLomkit(users)
+toPocketbase(users)
+toStrapi(users)
 ```
 
-> **Keywords** — `query-builder` · `typescript` · `adapters` · `filters` · `lomkit` · `pocketbase` · `strapi` · `backend-agnostic` · `zero-dependencies`
+```ts
+toLomkit(users)
+// { search: { filters: [
+//     { field: 'age', operator: '>=', value: 18 },
+//     { field: 'name', operator: 'like', value: 'A%', type: 'or' }
+//   ], sorts: [{ field: 'name', direction: 'asc' }], limit: 20, page: 2 } }
+
+toPocketbase(users)
+// { filter: "(age>=18) || (name~'A%')", sort: 'name', page: 2, perPage: 20 }
+
+toStrapi(users)
+// { filters: { $or: [{ age: { $gte: 18 } }, { name: { $startsWithi: 'A' } }] },
+//   sort: ['name:asc'], pagination: { page: 2, pageSize: 20 } }
+```
 
 ## Packages
 
 | Package | Role |
 |---|---|
-| [`dialectr`](packages/core) | The builder and the neutral query description. No runtime dependencies. |
-| [`dialectr-adapter-lomkit`](packages/adapters/lomkit) | Laravel + Lomkit search payload. |
-| [`dialectr-adapter-pocketbase`](packages/adapters/pocketbase) | PocketBase `filter`, `sort`, `fields`, `expand`, pagination. |
-| [`dialectr-adapter-strapi`](packages/adapters/strapi) | Strapi v5 `filters`, `sort`, `populate`, `pagination`. |
+| [`dialectr`](packages/core) | The builder and the neutral `Query`. No runtime dependencies. |
+| [`dialectr-adapter-lomkit`](packages/adapters/lomkit) | Laravel Lomkit `{ search }` payload. |
+| [`dialectr-adapter-pocketbase`](packages/adapters/pocketbase) | PocketBase `filter`, `sort`, `fields`, `expand`, `page`, `perPage`. |
+| [`dialectr-adapter-strapi`](packages/adapters/strapi) | Strapi v5 `filters`, `sort`, `fields`, `populate`, `pagination`. |
 
-An adapter is a pure function from a `Query` to the backend's native parameters. Write your own and publish it as `dialectr-adapter-*`. Adapters list `dialectr` as a peer dependency and should call `assertQuery(query)` first.
+Nothing is published to npm yet. Build from source:
+
+```bash
+pnpm install
+pnpm build
+pnpm test
+```
+
+Node.js 22 or later.
 
 ## Builder
 
-- `where(field, value)` / `where(field, operator, value)` / `orWhere(...)`
-- `whereGroup(cb)` / `orWhereGroup(cb)` for nested conditions
-- `sort(field, direction?)`, `select(...fields)`, `limit(n)`, `page(n)`
-- `search(text)` sets free-text search (non-empty, at most 1024 characters)
-- `extend(target, value)` attaches a backend-specific payload, see Extensions
-- `to(compiler)` runs any `Compiler<TOutput>` (`(query: Query) => TOutput`) on the built query, e.g. `query().to(toLomkit)`
-- `include(relation, cb?)`, `aggregate(type, relation, { field?, where? })`
-- `build()` returns a plain, serializable `Query`
+`query<T>()` returns an immutable builder. Field names are typed from `T`.
 
-Operators: `=` `!=` `>` `>=` `<` `<=` `like` `not like` `in` `not in`. The builder is immutable, and fields are typed from the interface you pass to `query<T>()`.
+| Method | Effect |
+|---|---|
+| `where(field, value)` / `where(field, operator, value)` | AND condition, operator defaults to `=` |
+| `orWhere(...)` | OR condition |
+| `whereGroup(cb)` / `orWhereGroup(cb)` | Nested group, empty groups are skipped |
+| `sort(field, direction?)` | `'asc'` (default) or `'desc'` |
+| `select(...fields)` | Fields to return |
+| `include(relation, cb?)` | Load a relation, optionally constrained by a sub-query |
+| `aggregate(type, relation, { field?, where? })` | `count`, `min`, `max`, `avg`, `sum`, `exists` |
+| `search(text)` | Free-text search, non-empty, at most 1024 characters |
+| `extend(target, value)` | Backend-specific options, see below |
+| `limit(n)` / `page(n)` | Positive integers |
+| `build()` | Returns a validated, serializable `Query` |
+| `to(compiler)` | `compiler(build())` |
 
-`AND` binds tighter than `OR`, as in SQL. An adapter that cannot express something (for example aggregates on PocketBase or Strapi) throws instead of dropping it silently.
-
-## Search and extensions
-
-`search(text)` stores free text on the query. Lomkit sends it as `search.text = { value }`. PocketBase and Strapi have no equivalent and throw "does not support free-text search".
-
-`extend(target, value)` is the escape hatch for backend-specific options. The target is an adapter name: `lomkit`, `pocketbase` or `strapi`. An adapter only reads its own target and ignores the others without error, so one query can carry options for several backends.
+Operators: `=` `!=` `>` `>=` `<` `<=` `like` `not like` `in` `not in`.
 
 ```ts
-query().where('age', '>=', 18).extend('lomkit', { scopes: [{ name: 'active' }] }).to(toLomkit)
+query<{ id: number }>().where('id', 'in', [1, 2, 3]).to(toPocketbase)
 ```
 
-- Lomkit merges `extensions.lomkit` into the search. Accepted keys: `scopes`, `instructions`, `gates` (arrays). Any other key, including core ones such as `filters` or `limit`, throws.
-- PocketBase and Strapi have nothing to merge: an extension aimed at them throws.
-- Targets and nested keys named `__proto__`, `constructor` or `prototype` are rejected. Values must be JSON-like (plain objects, arrays, strings, finite numbers, booleans, null, valid dates) and are copied when stored and when built.
+`to(compiler)` accepts any `Compiler<TOutput>`, that is `(query: Query) => TOutput`.
 
-## Validation and limits
+### AND before OR
 
+`AND` binds tighter than `OR`, as in SQL. `a AND b OR c AND d` means `(a AND b) OR (c AND d)`.
 
-Everything is validated when the query is built and again by each adapter, so a hand-made `Query` object gets the same checks.
+```ts
+const q = query().where('a', 1).where('b', 2).orWhere('c', 3).where('d', 4).build()
 
-- Values are `string`, finite `number`, `boolean`, `null`, `undefined` (sent as `null`) or a valid `Date`. Objects, arrays (outside `in` / `not in`), functions, `NaN` and `Infinity` throw.
-- `in` / `not in` take an array of those scalars. `like` / `not like` take a string.
-- Operators are looked up in a closed list; anything else (`__proto__`, `constructor`, `undefined`...) throws.
-- Sort direction must be `asc` or `desc`.
-- Empty filter groups in a hand-made query throw. The builder itself skips empty groups.
-- Values are copied when passed in and when built, so mutating an array or a `Date` afterwards does not change the builder. Only the scalar values above are supported.
-- Bounds, exported from the core: `MAX_DEPTH` (32 levels of groups or nested includes), `MAX_NODES` (1000 filters, sorts, selects, includes and aggregates in total), `MAX_LIST` (10000 items in an `in` list), `MAX_LIMIT` (10000, enforced by `limit()`), `MAX_FIELD_LENGTH` (256). Exceeding them throws a clear error.
-- Strapi: field, sort, select and relation names are dot-separated segments matching `[A-Za-z_][A-Za-z0-9_]*`. A segment starting with `$` is rejected, so a field cannot smuggle in an operator. `include('*')` is refused.
-- PocketBase: names match `[A-Za-z_][A-Za-z0-9_.:]*`. An `include` with its own filters, sorts, selects, nested includes, aggregates or pagination throws, because `expand` cannot express it.
+toPocketbase(q)
+// { filter: '(a=1 && b=2) || (c=3 && d=4)' }
+```
+
+Use `whereGroup` to change the grouping:
+
+```ts
+const q = query()
+  .where('active', true)
+  .whereGroup(group => group.where('role', 'admin').orWhere('role', 'editor'))
+  .build()
+
+toPocketbase(q)
+// { filter: "active=true && ((role='admin') || (role='editor'))" }
+```
+
+### Include and aggregate
+
+```ts
+const q = query()
+  .select('id', 'name')
+  .include('posts', posts => posts.where('published', true).sort('title', 'desc').limit(5))
+  .build()
+
+toLomkit(q)
+// { search: { selects: [{ field: 'id' }, { field: 'name' }],
+//   includes: [{ relation: 'posts', filters: [...], sorts: [...], limit: 5 }] } }
+
+toStrapi(q)
+// { fields: ['id', 'name'],
+//   populate: { posts: { filters: { published: { $eq: true } }, sort: ['title:desc'], pagination: { pageSize: 5 } } } }
+```
+
+PocketBase `expand` cannot be constrained: an `include` with a sub-query throws. A plain `include('posts')` works everywhere.
+
+Aggregates are Lomkit only:
+
+```ts
+query().aggregate('count', 'posts', { where: posts => posts.where('published', true) }).to(toLomkit)
+// { search: { aggregates: [{ relation: 'posts', type: 'count', filters: [...] }] } }
+```
+
+PocketBase and Strapi throw `does not support aggregates`. An adapter never drops something silently.
 
 ## like
 
-`like` and `not like` take a SQL-style pattern: `%` at the start and/or end, `\` to escape.
+`like` and `not like` take a SQL-style pattern: `%` at the start and/or end, `\` to escape `%` and `_`.
 
-| Pattern | Meaning | Strapi | PocketBase | Lomkit |
+| Pattern | Meaning | Lomkit | PocketBase | Strapi |
 |---|---|---|---|---|
-| `x%` | starts with | `$startsWithi` | `~'x%'` | `like 'x%'` |
-| `%x` | ends with | `$endsWithi` | `~'%x'` | `like '%x'` |
-| `%x%` | contains | `$containsi` | `~'%x%'` | `like '%x%'` |
-| `x` (no wildcard) | contains, case-insensitive | `$containsi` | `~'%x%'` | `like '%x%'` |
-| `a%b`, `a_b` | inner wildcard | error | passed through | passed through |
+| `x%` | starts with | `like 'x%'` | `~'x%'` | `$startsWithi` |
+| `%x` | ends with | `like '%x'` | `~'%x'` | `$endsWithi` |
+| `%x%` | contains | `like '%x%'` | `~'%x%'` | `$containsi` |
+| `x` (no wildcard) | contains, case-insensitive | `like '%x%'` | `~'%x%'` | `$containsi` |
+| `a%b`, `a_b` | inner wildcard | passed through | passed through | error |
 
-Wildcards inside a user-supplied value are not escaped automatically. Use `escapeLike` for the literal part:
+Wildcards in user input are not escaped for you. Wrap the literal part with `escapeLike`:
 
 ```ts
 import { escapeLike, query } from 'dialectr'
 
-query().where('title', 'like', `%${escapeLike(userInput)}%`).build()
+query().where('title', 'like', `%${escapeLike('50%')}%`).build()
 ```
 
-`escapeLike` prefixes `%`, `_` and `\` with a backslash. `parseLike(pattern)` and `containsPattern(pattern)` are exported for adapter authors. Strapi cannot express inner wildcards and throws on them. Case sensitivity and backslash escaping on Lomkit depend on your database and collation.
+`escapeLike('50%')` gives `50\%`. Case sensitivity of `like` on Lomkit depends on your database and collation.
 
-## Use with nexdk
+## Search and extend
 
-dialectr has no dependency on nexdk. Pass the compiled payload to a nexdk driver call, for example `sdk.lomkit.users.get(toLomkit(users))`.
+`search(text)` stores free text. Lomkit sends it as `search.text = { value }`. PocketBase and Strapi throw `does not support free-text search`.
 
-## Requirements
+`extend(target, value)` carries backend-specific options. The target is an adapter name (`lomkit`, `pocketbase`, `strapi`). An adapter reads only its own target and ignores the others, so one query can carry options for several backends.
 
-Node.js 18 or later.
+```ts
+const q = query().search('john').extend('lomkit', { scopes: [{ name: 'active' }] }).build()
+
+toLomkit(q)
+// { search: { text: { value: 'john' }, scopes: [{ name: 'active' }] } }
+```
+
+- Lomkit merges `scopes`, `instructions` and `gates` (arrays). Any other key, such as `filters`, throws.
+- PocketBase and Strapi accept no extension for their own target: it throws.
+- `getExtension(query, target)` reads an extension, returning `undefined` when absent.
+
+## Values
+
+- `string` (at most 4096 characters), finite `number`, `boolean`, `null`, `undefined` or a valid `Date`.
+- `undefined` becomes `null` and `Date` becomes an ISO string on Lomkit and Strapi. PocketBase writes dates as `'2026-01-02 03:04:05.000Z'`.
+- `in` and `not in` take an array of those values. `like` and `not like` take a string.
+- Objects, nested arrays, functions, `NaN` and `Infinity` throw.
+
+```ts
+query().where('deletedAt', undefined).where('createdAt', '>', new Date('2026-01-02T03:04:05Z')).to(toLomkit)
+// { search: { filters: [
+//   { field: 'deletedAt', operator: '=', value: null },
+//   { field: 'createdAt', operator: '>', value: '2026-01-02T03:04:05.000Z' }] } }
+```
+
+## Validation and limits
+
+`build()` returns a validated deep copy (a snapshot), and each adapter validates again through `prepareQuery`, so a hand-made `Query` object gets the same checks. Mutating a value after passing it in changes nothing.
+
+`assertQuery(query)` and `prepareQuery(query)` return the validated copy and throw on anything invalid: unknown operator, bad direction, empty group, sparse array, forbidden key (`__proto__`, `constructor`, `prototype`).
+
+Limits are exported from the core:
+
+| Constant | Value | Applies to |
+|---|---|---|
+| `MAX_NODES` | 1000 | Shared budget: filters, sorts, selects, includes, aggregates, `in` list items and extension entries |
+| `MAX_DEPTH` | 32 | Nested groups, includes and extension values |
+| `MAX_LIST` | 10000 | Items in one `in` list (still counted in `MAX_NODES`) |
+| `MAX_LIMIT` | 10000 | `limit()` |
+| `MAX_PAGE` | 1000000 | `page()` |
+| `MAX_FIELD_LENGTH` | 256 | Field, relation and extension target names |
+| `MAX_VALUE_LENGTH` | 4096 | Strings and `like` patterns |
+| `MAX_SEARCH_LENGTH` | 1024 | `search()` text |
+| `MAX_EXTENSION_KEYS` | 32 | Extension targets per query |
+
+Adapter name rules:
+
+- Strapi: dot-separated segments matching `[A-Za-z_][A-Za-z0-9_]*`, so a field cannot start with `$` and smuggle in an operator. `include('*')` is refused.
+- PocketBase: names match `[A-Za-z_][A-Za-z0-9_.:]*`. String values are escaped.
+
+## Write your own adapter
+
+An adapter is a pure function `(query: Query) => TOutput`. See [Write your own adapter](docs/src/content/docs/guides/write-your-own-adapter.md).
+
+## Ecosystem
+
+Same author, same spirit: small, simple, modular.
+
+- [nexdk](https://github.com/techmefr/nexdk): a frontend SDK that talks to any backend through one grammar. Pass a compiled payload to a driver, for example `sdk.lomkit.users.get(toLomkit(users))`. dialectr does not depend on nexdk.
+- [shamock](https://github.com/techmefr/shamock)
+- [beepr](https://github.com/techmefr/beepr)
 
 ## License
 
-MIT © techmefr
+MIT, see [LICENSE](LICENSE).

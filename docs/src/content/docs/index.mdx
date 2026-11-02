@@ -1,0 +1,24 @@
+---
+title: dialectr
+description: One query, every backend dialect. Zero-dependency query builder that compiles to lomkit, Strapi, PocketBase and more.
+template: splash
+hero:
+  tagline: One query, every backend dialect.
+  actions:
+    - text: Read the introduction
+      link: introduction/
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/techmefr/dialectr
+      icon: external
+      variant: minimal
+---
+
+Write a query once with a typed, immutable builder. Compile it for Lomkit, PocketBase or Strapi with one function call.
+
+```ts
+import { query } from 'dialectr'
+import { toPocketbase } from 'dialectr-adapter-pocketbase'
+
+query<{ age: number }>().where('age', '>=', 18).limit(20).to(toPocketbase)
+```

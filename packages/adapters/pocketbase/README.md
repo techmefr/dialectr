@@ -6,11 +6,16 @@ Compile a dialectr query into PocketBase `filter`, `sort`, `fields`, `expand`, `
 import { query } from 'dialectr'
 import { toPocketbase } from 'dialectr-adapter-pocketbase'
 
-toPocketbase(query().where('age', '>=', 18).sort('name').build())
+query().where('age', '>=', 18).sort('name', 'desc').limit(20).to(toPocketbase)
+// { filter: 'age>=18', sort: '-name', perPage: 20 }
 ```
 
-Aggregates and constrained includes throw. Values are escaped, field names are validated, and `like` without a wildcard means contains. Requires `dialectr` as a peer dependency and Node.js 18 or later. See the repository root README.
+- `like` without a wildcard means contains, case-insensitive.
+- `in` / `not in` become `||` / `&&` chains.
+- String values are escaped, field names must match `[A-Za-z_][A-Za-z0-9_.:]*`.
+- `include('posts')` becomes `expand`. An include with filters, sorts, selects, nested includes or pagination throws.
+- `aggregate`, `search` and `extend('pocketbase', ...)` throw, PocketBase has no equivalent. Extensions for other targets are ignored.
 
-`search(text)` and `extend('pocketbase', ...)` throw, as PocketBase has no equivalent. Extensions for other targets are ignored.
+`dialectr` is a peer dependency. Node.js 22 or later. See the [repository README](../../../README.md).
 
 MIT
