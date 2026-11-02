@@ -161,3 +161,14 @@ describe('toLomkit hardening', () => {
         })
     })
 })
+
+describe('page without limit', () => {
+    it('is refused', () => {
+        expect(() => toLomkit(raw({ page: 2 }))).toThrow('page() requires limit()')
+        expect(() => toLomkit(query().page(2).build())).toThrow('page() requires limit()')
+    })
+
+    it('is accepted with a limit', () => {
+        expect(() => toLomkit(query().limit(5).page(2).build())).not.toThrow()
+    })
+})

@@ -122,3 +122,14 @@ describe('toPocketbase hardening', () => {
         expect(built.toPocketbase(query().where('a', 1).build()).filter).toBe('a=1')
     })
 })
+
+describe('page without limit', () => {
+    it('is refused', () => {
+        expect(() => toPocketbase(raw({ page: 2 }))).toThrow('page() requires limit()')
+        expect(() => toPocketbase(query().page(2).build())).toThrow('page() requires limit()')
+    })
+
+    it('is accepted with a limit', () => {
+        expect(() => toPocketbase(query().limit(5).page(2).build())).not.toThrow()
+    })
+})

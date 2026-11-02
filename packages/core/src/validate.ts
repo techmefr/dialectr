@@ -216,6 +216,7 @@ function checkQuery(query: Query, depth: number, budget: Budget): void {
     }
     if (query.limit !== undefined) assertLimit(query.limit)
     if (query.page !== undefined) assertPage(query.page)
+    if (query.page !== undefined && query.limit === undefined) throw new Error('page() requires limit(): pagination has no effect without a limit')
 }
 
 export function prepareQuery(query: Query): Query {

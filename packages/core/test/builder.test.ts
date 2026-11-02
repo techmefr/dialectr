@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { groupByOr, query } from '../src/index.ts'
+import { groupByOr, prepareQuery, query } from '../src/index.ts'
 
 interface User {
     id: number
@@ -65,7 +65,7 @@ describe('query builder', () => {
 
     it('rejects unknown operators, non-array in, and bad pagination', () => {
         expect(() => query().where('a', '~~' as never, 1)).toThrow('Unknown operator')
-        expect(() => query().where('a', 'in', 1)).toThrow('requires an array')
+        expect(() => query().where('a', 'in', 1 as never)).toThrow('requires an array')
         expect(() => query().limit(0)).toThrow()
         expect(() => query().page(1.5)).toThrow()
     })
@@ -83,5 +83,24 @@ describe('groupByOr', () => {
 
     it('returns no cluster for an empty list', () => {
         expect(groupByOr([])).toEqual([])
+    })
+})
+
+describe('page without limit', () => {
+    it('is refused at build and to', () => {
+        expect(() => query().page(2).build()).toThrow('page() requires limit()')
+        expect(() => query().page(2).to(built => built)).toThrow('page() requires limit()')
+        expect(() => query().include('posts', inner => inner.page(2)).build()).toThrow('page() requires limit()')
+    })
+
+    it('is accepted with a limit in any call order', () => {
+        expect(query().page(2).limit(5).build()).toMatchObject({ page: 2, limit: 5 })
+        expect(query().limit(5).page(2).build()).toMatchObject({ page: 2, limit: 5 })
+        expect(query().limit(5).build().page).toBeUndefined()
+    })
+
+    it('is refused on a raw query too', () => {
+        const raw = { filters: [], sorts: [], selects: [], includes: [], aggregates: [], page: 1 }
+        expect(() => prepareQuery(raw)).toThrow('page() requires limit()')
     })
 })
