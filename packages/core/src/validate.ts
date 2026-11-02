@@ -198,6 +198,7 @@ function checkQuery(query: Query, depth: number, budget: Budget): void {
     for (const aggregate of query.aggregates) {
         assertField(aggregate.relation)
         if (aggregate.field !== undefined) assertField(aggregate.field)
+        if (aggregate.alias !== undefined) assertField(aggregate.alias)
         if (typeof aggregate.type !== 'string' || !AGGREGATES.has(aggregate.type)) {
             throw new Error(`Unknown aggregate type: "${String(aggregate.type)}"`)
         }

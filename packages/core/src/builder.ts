@@ -94,15 +94,17 @@ export class QueryBuilder<T extends object = Record<string, unknown>> {
     aggregate(
         type: AggregateType,
         relation: string,
-        options: { field?: string; where?: (builder: QueryBuilder) => QueryBuilder } = {},
+        options: { field?: string; alias?: string; where?: (builder: QueryBuilder) => QueryBuilder } = {},
     ): QueryBuilder<T> {
         assertField(relation)
         if (options.field !== undefined) assertField(options.field)
+        if (options.alias !== undefined) assertField(options.alias)
         const filters = options.where ? options.where(new QueryBuilder()).build().filters : []
         const aggregate: Aggregate = {
             type,
             relation,
             ...(options.field === undefined ? {} : { field: options.field }),
+            ...(options.alias === undefined ? {} : { alias: options.alias }),
             filters,
         }
         return this.#next({ aggregates: [...this.#query.aggregates, aggregate] })

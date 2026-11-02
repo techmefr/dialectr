@@ -89,7 +89,7 @@ Node.js 22 or later.
 | `sort(field, direction?)` | `'asc'` (default) or `'desc'` |
 | `select(...fields)` | Fields to return |
 | `include(relation, cb?)` | Load a relation, optionally constrained by a sub-query |
-| `aggregate(type, relation, { field?, where? })` | `count`, `min`, `max`, `avg`, `sum`, `exists` |
+| `aggregate(type, relation, { field?, alias?, where? })` | `count`, `min`, `max`, `avg`, `sum`, `exists` |
 | `search(text)` | Free-text search, non-empty, at most 1024 characters |
 | `extend(target, value)` | Backend-specific options, see below |
 | `limit(n)` / `page(n)` | Positive integers. `page(n)` without `limit(n)` makes `build()` and `to()` throw `page() requires limit()` |
@@ -163,6 +163,8 @@ query().aggregate('count', 'posts', { where: posts => posts.where('published', t
 // { search: { aggregates: [{ relation: 'posts', type: 'count', filters: [...] }] } }
 ```
 
+Lomkit names each result `relation_type[_field]` (`posts_count`, `posts_sum_views`). When several aggregates share type, relation and field, the adapter gives the later ones a unique `alias` (`posts_count_2`, `posts_count_3`) so they do not overwrite each other; pass `alias` to choose the name yourself.
+
 PocketBase and Strapi throw `does not support aggregates`. An adapter never drops something silently.
 
 ## like
@@ -187,6 +189,8 @@ query().where('title', 'like', `%${escapeLike('50%')}%`).build()
 
 `escapeLike('50%')` gives `50\%`. Case sensitivity of `like` on Lomkit depends on your database and collation.
 
+`escapeLike` relies on `\` as the LIKE escape character. That holds on MySQL and PostgreSQL. SQLite has no default escape character: through Lomkit on SQLite the `\` is a literal character and `escapeLike('100%')` matches nothing. On SQLite, avoid user input in `like` or pass it without `escapeLike` and accept that `%` and `_` stay wildcards. `like` is also ASCII-only case-insensitive on SQLite, and `$containsi` on Strapi with SQLite behaves the same way.
+
 ## Search and extend
 
 `search(text)` stores free text. Lomkit sends it as `search.text = { value }`. PocketBase and Strapi throw `does not support free-text search`.
@@ -207,9 +211,12 @@ toLomkit(q)
 ## Values
 
 - `string` (at most 4096 characters), finite `number`, `boolean`, `null`, `undefined` or a valid `Date`.
-- `undefined` becomes `null` and `Date` becomes an ISO string on Lomkit and Strapi. PocketBase writes dates as `'2026-01-02 03:04:05.000Z'`.
+- `undefined` becomes `null`. `Date` becomes an ISO string on Strapi, `'2026-01-02 03:04:05'` (UTC, no milliseconds, Laravel's native `Y-m-d H:i:s`) on Lomkit, and `'2026-01-02 03:04:05.000Z'` on PocketBase.
+- Lomkit on SQLite compares dates as text against the stored `Y-m-d H:i:s` value, which is why `Date` is not sent as ISO there: `2026-01-02T03:04:05.000Z` sorts after `2026-01-02 03:04:05` and breaks equality and `>=` on the exact boundary. MySQL and PostgreSQL accept the `Y-m-d H:i:s` form too. A string you pass yourself is sent as is.
+- `null` on Strapi: `= null` becomes `$null: true` and `!= null` becomes `$notNull: true`. Any other operator with `null` throws.
 - `in` and `not in` take an array of those values. `like` and `not like` take a string.
-- An empty `in` matches nothing and an empty `not in` matches everything. PocketBase gets `1=0` and `1=1` (a bare `true` or `false` is rejected by the server), Lomkit and Strapi get the empty array.
+- An empty `in` matches nothing and an empty `not in` matches everything. PocketBase gets `1=0` and `1=1` (a bare `true` or `false` is rejected by the server). Lomkit rejects an empty list with a 422, so `in []` is sent as `value: [null]` (accepted, matches nothing) and `not in []` is removed from the filters. Strapi does not transport an empty array, so `in []` becomes `{ $and: [{ f: { $null: true } }, { f: { $notNull: true } }] }` (matches nothing) and `not in []` is removed.
+- Removing `not in []` keeps the logic exact: in an `and` chain the condition disappears, but inside an `or` cluster the cluster is always true, so the whole expression (or the enclosing group) becomes true and its filters vanish. `where('a', 1).orWhere('b', 'not in', [])` therefore returns every row.
 - PocketBase compares dates as text. Pass a `Date` so it is written with the space separator the server stores; an ISO string with a `T` is sent as is, and a comparison on the exact boundary then shifts.
 - Objects, nested arrays, functions, `NaN` and `Infinity` throw.
 

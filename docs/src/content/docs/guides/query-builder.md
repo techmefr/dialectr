@@ -13,7 +13,7 @@ description: Every builder method, operators and precedence.
 | `sort(field, direction?)` | `'asc'` (default) or `'desc'` |
 | `select(...fields)` | Fields to return |
 | `include(relation, cb?)` | Load a relation, optionally constrained |
-| `aggregate(type, relation, { field?, where? })` | `count`, `min`, `max`, `avg`, `sum`, `exists` |
+| `aggregate(type, relation, { field?, alias?, where? })` | `count`, `min`, `max`, `avg`, `sum`, `exists` |
 | `search(text)` | Free-text search |
 | `extend(target, value)` | Backend-specific options |
 | `limit(n)` / `page(n)` | Positive integers. `page(n)` without `limit(n)` makes `build()` and `to()` throw `page() requires limit()` |

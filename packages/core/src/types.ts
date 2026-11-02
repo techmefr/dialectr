@@ -31,6 +31,7 @@ export interface Aggregate {
     type: AggregateType
     relation: string
     field?: string
+    alias?: string
     filters: FilterNode[]
 }
 

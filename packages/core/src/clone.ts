@@ -102,6 +102,7 @@ function cloneAggregate(aggregate: unknown, depth: number): Aggregate {
         type: aggregate.type as Aggregate['type'],
         relation: aggregate.relation as string,
         ...(aggregate.field === undefined ? {} : { field: aggregate.field as string }),
+        ...(aggregate.alias === undefined ? {} : { alias: aggregate.alias as string }),
         filters: cloneNodes(aggregate.filters, depth),
     }
 }
