@@ -187,6 +187,8 @@ toLomkit(q)
 - `string` (at most 4096 characters), finite `number`, `boolean`, `null`, `undefined` or a valid `Date`.
 - `undefined` becomes `null` and `Date` becomes an ISO string on Lomkit and Strapi. PocketBase writes dates as `'2026-01-02 03:04:05.000Z'`.
 - `in` and `not in` take an array of those values. `like` and `not like` take a string.
+- An empty `in` matches nothing and an empty `not in` matches everything. PocketBase gets `1=0` and `1=1` (a bare `true` or `false` is rejected by the server), Lomkit and Strapi get the empty array.
+- PocketBase compares dates as text. Pass a `Date` so it is written with the space separator the server stores; an ISO string with a `T` is sent as is, and a comparison on the exact boundary then shifts.
 - Objects, nested arrays, functions, `NaN` and `Infinity` throw.
 
 ```ts

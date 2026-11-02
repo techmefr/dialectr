@@ -40,6 +40,8 @@ query().select('id').include('posts').to(toPocketbase)
 
 Strings are escaped and field names must match `[A-Za-z_][A-Za-z0-9_.:]*`.
 
+An empty `in` becomes `1=0` and an empty `not in` becomes `1=1`, because PocketBase rejects a bare `true` or `false`. Pass dates as `Date`: they are written like PocketBase stores them (`2026-01-02 03:04:05.000Z`). A string is sent as is, and an ISO string with a `T` shifts a comparison on the exact boundary.
+
 ## Strapi
 
 ```ts

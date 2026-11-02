@@ -11,7 +11,8 @@ query().where('age', '>=', 18).sort('name', 'desc').limit(20).to(toPocketbase)
 ```
 
 - `like` without a wildcard means contains, case-insensitive.
-- `in` / `not in` become `||` / `&&` chains.
+- `in` / `not in` become `||` / `&&` chains. An empty `in` becomes `1=0`, an empty `not in` becomes `1=1`.
+- Dates: pass a `Date`, it is written as `YYYY-MM-DD HH:mm:ss.sssZ` like PocketBase stores it. A string is sent as is and never rewritten, because the adapter cannot tell a date field from a text field that holds ISO text; an ISO string with a `T` sorts after the stored space form, so a comparison on the exact boundary shifts.
 - String values are escaped, field names must match `[A-Za-z_][A-Za-z0-9_.:]*`.
 - `page` requires `limit`: a query with a page and no limit throws.
 - `include('posts')` becomes `expand`. An include with filters, sorts, selects, nested includes or pagination throws.
