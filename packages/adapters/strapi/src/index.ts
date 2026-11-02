@@ -1,4 +1,4 @@
-import { getExtension, groupByOr, parseLike, prepareQuery } from 'dialectr'
+import { getExtension, groupByOr, parseLike, prepareQuery, pruneAlwaysTrue } from 'dialectr'
 import type { Condition, FilterNode, Query } from 'dialectr'
 
 export const STRAPI_TARGET = 'strapi'
@@ -23,6 +23,12 @@ const SIMPLE = new Map<string, string>([
     ['in', '$in'],
     ['not in', '$notIn'],
 ])
+
+export const STRAPI_MAX_PAGE_SIZE = 100
+
+export interface StrapiOptions {
+    maxPageSize?: number
+}
 
 const SEGMENT = /^[A-Za-z_][A-Za-z0-9_]*$/
 
@@ -68,6 +74,14 @@ function condition(node: Condition): StrapiFilter {
     }
     const operator = SIMPLE.get(node.operator)
     if (operator === undefined) throw new Error(`Unknown operator: "${String(node.operator)}"`)
+    if (node.value === null || node.value === undefined) {
+        if (node.operator === '=') return nest(node.field, { $null: true })
+        if (node.operator === '!=') return nest(node.field, { $notNull: true })
+        throw new Error(`Strapi cannot compare null with "${node.operator}"`)
+    }
+    if (node.operator === 'in' && Array.isArray(node.value) && node.value.length === 0) {
+        return { $and: [nest(node.field, { $null: true }), nest(node.field, { $notNull: true })] }
+    }
     const value = Array.isArray(node.value) ? node.value.map(scalar) : scalar(node.value)
     return nest(node.field, { [operator]: value })
 }
@@ -94,12 +108,13 @@ function isPlain(inner: Query): boolean {
     )
 }
 
-function params(query: Query): StrapiParams {
+function params(query: Query, maxPageSize: number): StrapiParams {
     if (query.search !== undefined) throw new Error('Strapi does not support free-text search')
     if (getExtension(query, STRAPI_TARGET) !== undefined) throw new Error('Strapi does not support extensions')
     if (query.aggregates.length > 0) throw new Error('Strapi does not support aggregates')
     const result: StrapiParams = {}
-    if (query.filters.length > 0) result.filters = expression(query.filters)
+    const pruned = pruneAlwaysTrue(query.filters)
+    if (pruned !== null && pruned.length > 0) result.filters = expression(pruned)
     if (query.sorts.length > 0) {
         result.sort = query.sorts.map(sort => `${path(sort.field).join('.')}:${sort.direction}`)
     }
@@ -108,7 +123,10 @@ function params(query: Query): StrapiParams {
         const relations = query.includes.map(include => relationPath(include.relation))
         result.populate = query.includes.every(include => isPlain(include.query))
             ? relations
-            : Object.fromEntries(query.includes.map((include, index) => [relations[index], params(include.query)]))
+            : Object.fromEntries(query.includes.map((include, index) => [relations[index], params(include.query, maxPageSize)]))
+    }
+    if (query.limit !== undefined && query.limit > maxPageSize) {
+        throw new Error(`Strapi caps pageSize at ${maxPageSize}: limit ${query.limit} is not supported`)
     }
     if (query.page !== undefined || query.limit !== undefined) {
         result.pagination = {
@@ -119,6 +137,6 @@ function params(query: Query): StrapiParams {
     return result
 }
 
-export function toStrapi(query: Query): StrapiParams {
-    return params(prepareQuery(query))
+export function toStrapi(query: Query, options: StrapiOptions = {}): StrapiParams {
+    return params(prepareQuery(query), options.maxPageSize ?? STRAPI_MAX_PAGE_SIZE)
 }

@@ -13,6 +13,8 @@ const raw = (patch: Partial<Query> = {}): Query => ({
     ...patch,
 })
 
+const NEVER = { $and: [{ id: { $null: true } }, { id: { $notNull: true } }] }
+
 const condition = (field: string, value: unknown = 1, operator = '='): FilterNode => ({
     kind: 'condition',
     boolean: 'and',
@@ -67,14 +69,14 @@ describe('toStrapi hardening', () => {
     })
 
     it('maps empty in and not in lists', () => {
-        expect(toStrapi(query().where('id', 'in', []).build()).filters).toEqual({ id: { $in: [] } })
-        expect(toStrapi(query().where('id', 'not in', []).build()).filters).toEqual({ id: { $notIn: [] } })
+        expect(toStrapi(query().where('id', 'in', []).build()).filters).toEqual(NEVER)
+        expect(toStrapi(query().where('id', 'not in', []).build()).filters).toBeUndefined()
     })
 
     it('maps null, undefined and Date values', () => {
-        expect(toStrapi(query().where('a', null).build()).filters).toEqual({ a: { $eq: null } })
-        expect(toStrapi(query().where('a', undefined).build()).filters).toEqual({ a: { $eq: null } })
-        expect(toStrapi(query().where('a', '!=', null).build()).filters).toEqual({ a: { $ne: null } })
+        expect(toStrapi(query().where('a', null).build()).filters).toEqual({ a: { $null: true } })
+        expect(toStrapi(query().where('a', undefined).build()).filters).toEqual({ a: { $null: true } })
+        expect(toStrapi(query().where('a', '!=', null).build()).filters).toEqual({ a: { $notNull: true } })
         expect(toStrapi(query().where('a', new Date('2024-01-02T03:04:05.000Z')).build()).filters).toEqual({
             a: { $eq: '2024-01-02T03:04:05.000Z' },
         })
