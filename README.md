@@ -58,6 +58,12 @@ toStrapi(users)
 
 > **Keywords** — query builder · TypeScript · fluent API · immutable queries · query AST · compiler · backend adapters · filters · pagination · Lomkit · Laravel · PocketBase · Strapi · neXdk
 
+## When it pays off
+
+dialectr costs a dependency and an abstraction layer (about 14.5 kB minified for the core and the three adapters, against about 1.2 kB for two hand-written builders measured on one backend). It pays off from 2 backends, or from about 5 different query shapes on one resource. The more backends, the more it saves: one query is written once instead of once per backend.
+
+With a single backend and few shapes (a filter on one field, a sort, a page), a hand-written function that builds that backend's parameters is shorter and has nothing to learn. Start there. Move to dialectr when a second backend appears or when the builders start to repeat the same filter logic.
+
 ## Packages
 
 | Package | Role |
