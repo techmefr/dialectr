@@ -1,16 +1,10 @@
-import { cloneExtensionValue, cloneValue } from './clone.ts'
-import {
-    assertDirection,
-    assertExtensionKey,
-    assertExtensionValue,
-    assertField,
-    assertLimit,
-    assertOperator,
-    assertPage,
-    assertSearch,
-    assertValue,
-    prepareQuery,
-} from './validate.ts'
+import { assertDirection, assertField, assertLimit, assertPage, assertSearch } from './assertions.ts'
+import type { ComparisonOperator, ExtensionMap, Field, FieldValue, Present } from './builder-types.ts'
+import { runCallback } from './callback.ts'
+import { cloneExtensionValue } from './clone.ts'
+import { conditionNode, isBlankCondition } from './condition.ts'
+import { assertExtensionKey, assertExtensionValue } from './extensions.ts'
+import { prepareQuery } from './validate.ts'
 import type {
     Aggregate,
     AggregateType,
@@ -18,20 +12,11 @@ import type {
     Connector,
     FilterNode,
     Include,
-    Operator,
     Query,
     SortDirection,
 } from './types.ts'
 
-export type Field<T> = Extract<keyof T, string>
-
-export type FieldValue<T, K extends Field<T>> = Exclude<T[K], undefined>
-
-export interface ExtensionMap {}
-
-export type Present<V> = Exclude<V, null | undefined | false | 0 | ''>
-
-export type ComparisonOperator = '=' | '!=' | '>' | '>=' | '<' | '<='
+export type { ComparisonOperator, ExtensionMap, Field, FieldValue, Present } from './builder-types.ts'
 
 const emptyQuery = (): Query => ({
     filters: [],
@@ -41,25 +26,7 @@ const emptyQuery = (): Query => ({
     aggregates: [],
 })
 
-function isBlank(value: unknown): boolean {
-    return value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)
-}
-
 const trusted = new WeakSet<Query>()
-
-function runCallback<B extends object>(
-    method: string,
-    callback: (builder: B) => B,
-    received: B,
-): B {
-    const result = callback(received)
-    if (result === undefined || result === received) {
-        throw new Error(
-            `${method} callback must chain the builder and return the result: builders are immutable, so write builder => builder.where(...).where(...) instead of calling builder.where(...) and returning the original builder`,
-        )
-    }
-    return result
-}
 
 export class QueryBuilder<T extends object = Record<string, unknown>> {
     readonly #query: Query
@@ -93,8 +60,7 @@ export class QueryBuilder<T extends object = Record<string, unknown>> {
     ): QueryBuilder<T>
     whereIf(field: Field<T>, operator: 'like' | 'not like', value: string | null | undefined): QueryBuilder<T>
     whereIf(field: Field<T>, operatorOrValue: unknown, maybeValue?: unknown): QueryBuilder<T> {
-        const value = arguments.length >= 3 ? maybeValue : operatorOrValue
-        if (isBlank(value)) return this
+        if (isBlankCondition(operatorOrValue, maybeValue, arguments.length)) return this
         return this.#condition('and', field, operatorOrValue, maybeValue, arguments.length)
     }
 
@@ -107,8 +73,7 @@ export class QueryBuilder<T extends object = Record<string, unknown>> {
     ): QueryBuilder<T>
     orWhereIf(field: Field<T>, operator: 'like' | 'not like', value: string | null | undefined): QueryBuilder<T>
     orWhereIf(field: Field<T>, operatorOrValue: unknown, maybeValue?: unknown): QueryBuilder<T> {
-        const value = arguments.length >= 3 ? maybeValue : operatorOrValue
-        if (isBlank(value)) return this
+        if (isBlankCondition(operatorOrValue, maybeValue, arguments.length)) return this
         return this.#condition('or', field, operatorOrValue, maybeValue, arguments.length)
     }
 
@@ -208,19 +173,7 @@ export class QueryBuilder<T extends object = Record<string, unknown>> {
         maybeValue: unknown,
         argumentCount: number,
     ): QueryBuilder<T> {
-        const hasOperator = argumentCount >= 3
-        const operator = hasOperator ? operatorOrValue : '='
-        const value = hasOperator ? maybeValue : operatorOrValue
-        assertField(field)
-        assertOperator(operator)
-        assertValue(operator, value)
-        const node: FilterNode = {
-            kind: 'condition',
-            boolean,
-            field,
-            operator: operator as Operator,
-            value: cloneValue(value),
-        }
+        const node = conditionNode(boolean, field, operatorOrValue, maybeValue, argumentCount)
         return this.#next({ filters: [...this.#query.filters, node] })
     }
 
