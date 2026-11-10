@@ -121,6 +121,10 @@ import { escapeLike, query } from 'dialectr'
 query().where('title', 'like', `%${escapeLike('50%')}%`).build()
 ```
 
+:::caution[SQLite]
+`escapeLike` relies on `\` as the LIKE escape character. MySQL and PostgreSQL honour it. SQLite has no default escape character and Lomkit (Laravel) sends no `ESCAPE` clause, so on a Lomkit backend running SQLite the `\` is a literal character: `escapeLike('100%')` matches nothing. This is a limit of the backend, not of the adapter. On SQLite, avoid user input in `like`, or pass it without `escapeLike` and accept that `%` and `_` stay wildcards. `like` is also ASCII-only case-insensitive on SQLite.
+:::
+
 ## Search and extend
 
 `search(text)` is Lomkit only, emitted as `search.text = { value }`. PocketBase and Strapi throw.
